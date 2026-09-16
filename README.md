@@ -1,10 +1,10 @@
-# 🚦 GEO_IA: Sistema de Suporte à Decisão e Auditoria de Infraestrutura Viária — Foz do Iguaçu
+# 🚦 WazeFoz: Sistema de Suporte à Decisão e Auditoria de Infraestrutura Viária — Foz do Iguaçu
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge.svg)](https://wazefoz.streamlit.app/)
 [![License: MIT](https://img.shields.shields.shields.org/badge/License-MIT-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.shields.io/badge/Python-3.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
 
-> **GEO_IA** é a arquitetura algorítmica e computacional *open-source* implantada na plataforma web **WazeFoz** ([wazefoz.streamlit.app](https://wazefoz.streamlit.app/)). O sistema opera como um Sistema de Apoio à Decisão (SAD) voltado à gestão de ativos viários, mapeamento de estrangulamentos de fluxo e comprovação técnica de prioridades para intervenções físicas e engenharia geométrica em Foz do Iguaçu (PR).
+> **WazeFoz** é a arquitetura algorítmica e computacional *open-source* implantada na plataforma web  ([wazefoz.streamlit.app](https://wazefoz.streamlit.app/)). O sistema opera como um Sistema de Apoio à Decisão (SAD) voltado à gestão de ativos viários, mapeamento de estrangulamentos de fluxo e comprovação técnica de prioridades para intervenções físicas e engenharia geométrica em Foz do Iguaçu (PR).
 
 ***
 
