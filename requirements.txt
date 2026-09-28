@@ -10,6 +10,8 @@ statsmodels>=0.14.0
 ruptures>=1.1.9
 matplotlib
 seaborn
+pydeck>=0.9.1
+streamlit-plotly-events>=0.0.6
 
 
 
