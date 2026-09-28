@@ -3628,3 +3628,8 @@ footer_html = f"""
 </div>
 """
 st.markdown(footer_html, unsafe_allow_html=True)
+    © {current_foz_datetime.year} GPMME / LAGGRA / LACA — UNILA · Foz do Iguaçu · Uso acadêmico e de pesquisa
+  </div>
+</div>
+"""
+st.markdown(footer_html, unsafe_allow_html=True)
