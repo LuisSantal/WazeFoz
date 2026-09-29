@@ -16,7 +16,7 @@ from folium import plugins
 from streamlit_folium import st_folium
 from folium.plugins import MarkerCluster
 import pydeck as pdk
-from streamlit_autorefresh import st_autorefresh
+
 # =========================================================
 # BLOCO 1 — CONFIGURAÇÃO BASE DO APP
 # =========================================================
@@ -27,7 +27,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-st_autorefresh(interval=600_000, key="ciclo_10min")
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -1335,41 +1335,37 @@ def generate_heatmap(dataframe_json: str) -> folium.Map | None:
 
 
 # =========================================================
-# BLOCO 3B — MOTOR DE VISUALIZAÇÃO 3D
+# BLOCO 3B — VISUALIZAÇÃO 3D (renderiza somente quando solicitada)
 # =========================================================
-FOZ_CENTER_LAT = -25.545
-FOZ_CENTER_LON = -54.585
+FOZ_CENTER_LAT, FOZ_CENTER_LON = -25.545, -54.585
 DECK_MAP_STYLES = {"Claro": "light", "Escuro": "dark", "Ruas": "road"}
 
 
-def build_deck_view_state(latitude=FOZ_CENTER_LAT, longitude=FOZ_CENTER_LON,
-                          zoom=12.2, pitch=50.0, bearing=0.0):
-    return pdk.ViewState(latitude=float(latitude), longitude=float(longitude),
-                         zoom=float(zoom), pitch=float(pitch), bearing=float(bearing))
-
-
-def prepare_points_for_deck(dataframe):
-    if dataframe is None or dataframe.empty or not {"lat", "lon"}.issubset(dataframe.columns):
+def prepare_points_for_deck(frame):
+    if frame is None or frame.empty or not {"lat", "lon"}.issubset(frame.columns):
         return pd.DataFrame()
-    result = dataframe.copy()
+    result = frame.copy()
     result["lat"] = pd.to_numeric(result["lat"], errors="coerce")
     result["lon"] = pd.to_numeric(result["lon"], errors="coerce")
     result = result.loc[
         result["lat"].between(FOZ_LATITUDE_MIN, FOZ_LATITUDE_MAX)
         & result["lon"].between(FOZ_LONGITUDE_MIN, FOZ_LONGITUDE_MAX)
     ].copy()
+    if result.empty:
+        return result
     for col in ("type", "subtype", "street"):
         if col not in result:
             result[col] = "N/D"
         result[col] = result[col].fillna("N/D").astype(str)
     result["hora_label"] = (
-        pd.to_datetime(result["timestamp"], errors="coerce").dt.strftime("%d/%m %H:%M").fillna("N/D")
+        pd.to_datetime(result["timestamp"], errors="coerce")
+        .dt.strftime("%d/%m %H:%M").fillna("N/D")
         if "timestamp" in result else "N/D"
     )
     return result
 
 
-def hex_color_to_rgb_list(color, alpha=200):
+def hex_color_to_rgba(color, alpha=200):
     value = str(color).lstrip("#")
     try:
         return [int(value[i:i+2], 16) for i in (0, 2, 4)] + [alpha]
@@ -1377,133 +1373,115 @@ def hex_color_to_rgb_list(color, alpha=200):
         return [144, 164, 174, alpha]
 
 
-def add_severity_rgb_column(frame):
-    if frame is None or frame.empty:
+def colorize_3d(frame):
+    if frame.empty:
         return frame
     result = frame.copy()
     result["rgb_color"] = result.apply(
-        lambda row: hex_color_to_rgb_list(
-            get_incident_severity_color(row.get("type"), row.get("subtype"))
-        ), axis=1)
+        lambda row: hex_color_to_rgba(get_incident_severity_color(
+            row.get("type"), row.get("subtype"))), axis=1)
     return result
 
 
-def build_hexagon_3d_layer(frame, radius_meters=120, elevation_scale=18):
-    if frame is None or frame.empty:
-        return None
-    return pdk.Layer(
-        "HexagonLayer", data=frame[["lat", "lon"]], get_position="[lon, lat]",
-        radius=radius_meters, elevation_scale=elevation_scale, extruded=True,
-        coverage=0.88, opacity=0.65, pickable=True, auto_highlight=True,
-        color_range=[[255,255,178], [254,204,92], [253,141,60],
-                     [240,59,32], [189,0,38], [128,0,38]],
-    )
-
-
-def build_scatter_3d_layer(frame, radius_meters=45):
-    if frame is None or frame.empty:
-        return None
-    return pdk.Layer(
-        "ScatterplotLayer", data=frame, get_position="[lon, lat]",
-        get_fill_color="rgb_color", get_radius=radius_meters,
-        radius_min_pixels=3, radius_max_pixels=28, pickable=True,
-        auto_highlight=True, stroked=True,
-        get_line_color=[255,255,255,120], line_width_min_pixels=1,
-    )
-
-
-def aggregate_incidents_by_street_for_3d(frame, top_n=20):
-    if frame is None or frame.empty or not {"street","lat","lon"}.issubset(frame.columns):
+def aggregate_streets_3d(frame, top_n=20):
+    if frame.empty or not {"street", "lat", "lon"}.issubset(frame.columns):
         return pd.DataFrame()
     base = frame.loc[~frame["street"].fillna("N/D").astype(str).isin(
         ["NA", "nan", "", "N/A", "N/D"])]
     if base.empty:
         return pd.DataFrame()
-    result = (base.groupby("street").agg(ocorrencias=("street", "size"),
-                                          lat=("lat", "mean"), lon=("lon", "mean"))
+    result = (base.groupby("street")
+              .agg(ocorrencias=("street", "size"), lat=("lat", "mean"), lon=("lon", "mean"))
               .reset_index().nlargest(top_n, "ocorrencias"))
-    maximum = max(int(result["ocorrencias"].max()), 1)
-    result["intensidade"] = result["ocorrencias"] / maximum
-    result["width_px"] = 2 + result["intensidade"] * 10
-    result["rgb_color"] = result["intensidade"].apply(
-        lambda value: [int(60+195*value), int(190-170*value),
-                       int(120-90*value), 210])
+    ratio = result["ocorrencias"] / max(int(result["ocorrencias"].max()), 1)
+    result["width_px"] = 2 + ratio * 10
+    result["rgb_color"] = ratio.map(
+        lambda x: [int(60+195*x), int(190-170*x), int(120-90*x), 210])
     return result
 
 
-def build_column_3d_layer(frame, elevation_scale=30, radius_meters=90):
-    if frame is None or frame.empty:
-        return None
-    return pdk.Layer("ColumnLayer", data=frame, get_position="[lon, lat]",
-                     get_elevation="ocorrencias", elevation_scale=elevation_scale,
-                     radius=radius_meters, get_fill_color="rgb_color",
-                     pickable=True, auto_highlight=True, extruded=True)
-
-
-def build_heatmap_gl_layer(frame):
-    if frame is None or frame.empty:
-        return None
-    return pdk.Layer("HeatmapLayer", data=frame[["lat", "lon"]],
-                     get_position="[lon, lat]", radius_pixels=55)
-
-
-def build_jams_path_3d_layer(frame):
-    if frame is None or frame.empty or "line" not in frame.columns:
+def build_jams_paths_3d(frame):
+    if frame is None or frame.empty or "line" not in frame:
         return None
     records = []
-    for _, row in frame.iterrows():
+    for _, row in frame.head(3000).iterrows():
         try:
-            value = row.get("line")
-            line = value if isinstance(value, list) else ast.literal_eval(str(value))
-            path = [[float(point["x"]), float(point["y"])] for point in line
-                    if isinstance(point, dict) and "x" in point and "y" in point]
+            raw = row["line"]
+            values = raw if isinstance(raw, list) else ast.literal_eval(str(raw))
+            path = [[float(v["x"]), float(v["y"])] for v in values
+                    if isinstance(v, dict) and "x" in v and "y" in v]
             if len(path) < 2:
                 continue
             speed = pd.to_numeric(row.get("speed"), errors="coerce")
             speed_kmh = float(speed) * 3.6 if pd.notna(speed) else 0.0
-            delay = pd.to_numeric(row.get("delay", 0), errors="coerce")
-            records.append({
-                "path": path, "street": str(row.get("street", "Via")),
-                "speed_kmh": round(speed_kmh, 1),
-                "delay_s": round(float(delay), 1) if pd.notna(delay) else 0.0,
-                "rgb_color": hex_color_to_rgb_list(get_congestion_color(speed_kmh), 220),
-            })
-        except (ValueError, TypeError, KeyError, SyntaxError):
+            records.append({"path": path, "street": str(row.get("street", "Via")),
+                            "speed_kmh": round(speed_kmh, 1),
+                            "rgb_color": hex_color_to_rgba(get_congestion_color(speed_kmh), 220)})
+        except (TypeError, ValueError, SyntaxError, KeyError):
             continue
     if not records:
         return None
     return pdk.Layer("PathLayer", data=pd.DataFrame(records), get_path="path",
-                     get_color="rgb_color", get_width=9, width_min_pixels=3,
+                     get_color="rgb_color", get_width=8, width_min_pixels=3,
                      pickable=True, auto_highlight=True)
 
 
-def build_arc_3d_layer(frame):
-    if frame is None or frame.empty:
-        return None
-    arc = frame.copy()
-    arc["origem_lon"] = FOZ_CENTER_LON
-    arc["origem_lat"] = FOZ_CENTER_LAT
-    return pdk.Layer("ArcLayer", data=arc,
-                     get_source_position="[origem_lon, origem_lat]",
-                     get_target_position="[lon, lat]",
-                     get_source_color=[37,99,235,140], get_target_color="rgb_color",
-                     get_width="width_px", width_min_pixels=2,
-                     width_max_pixels=14, pickable=True, auto_highlight=True)
-
-
-DECK_TOOLTIP_INCIDENTS = {"html": "<b>{type}</b><br>{subtype}<br>{street}<br>{hora_label}"}
-DECK_TOOLTIP_JAMS = {"html": "<b>{street}</b><br>{speed_kmh} km/h<br>Atraso: {delay_s}s"}
-DECK_TOOLTIP_STREETS = {"html": "<b>{street}</b><br>{ocorrencias} registros"}
-
-
-def render_deck_scene(layers, view_state, tooltip, map_style_label="Escuro", height=620):
-    active = [layer for layer in layers if layer is not None]
-    if not active:
-        st.info("Nenhuma camada 3D disponível para o recorte atual.")
+def render_3d_map(frame, jams_frame, mode, style, zoom, pitch, bearing, radius, elevation,
+                  element_key="city3d", height=620):
+    if mode == "Fluxo de congestionamento":
+        layer = build_jams_paths_3d(jams_frame)
+        layers = [layer] if layer is not None else []
+        tooltip = {"html": "<b>{street}</b><br>{speed_kmh} km/h"}
+        point_count = len(jams_frame) if jams_frame is not None else 0
+    else:
+        points = colorize_3d(prepare_points_for_deck(frame))
+        point_count = len(points)
+        if len(points) > 40000:
+            points = points.sample(40000, random_state=42)
+            st.caption("Mapa amostrado em 40.000 registros; os indicadores usam a base inteira.")
+        aggregate = aggregate_streets_3d(points, 25)
+        tooltip = {"html": "<b>{street}</b><br>{ocorrencias} registros"}
+        layers = []
+        if mode == "Densidade hexagonal" and not points.empty:
+            layers = [pdk.Layer("HexagonLayer", data=points[["lat", "lon"]],
+                       get_position="[lon, lat]", radius=radius, elevation_scale=elevation,
+                       extruded=True, pickable=True, auto_highlight=True)]
+            tooltip = {"html": "<b>{elevationValue}</b> registros"}
+        elif mode == "Colunas por via" and not aggregate.empty:
+            layers = [pdk.Layer("ColumnLayer", data=aggregate,
+                       get_position="[lon, lat]", get_elevation="ocorrencias",
+                       elevation_scale=elevation*4, radius=90,
+                       get_fill_color="rgb_color", extruded=True, pickable=True)]
+        elif mode == "Pontos + calor" and not points.empty:
+            layers = [pdk.Layer("HeatmapLayer", data=points[["lat", "lon"]],
+                        get_position="[lon, lat]", radius_pixels=50),
+                      pdk.Layer("ScatterplotLayer", data=points,
+                        get_position="[lon, lat]", get_fill_color="rgb_color",
+                        get_radius=50, radius_min_pixels=3, pickable=True)]
+            tooltip = {"html": "<b>{type}</b><br>{subtype}<br>{street}<br>{hora_label}"}
+        elif mode == "Arcos de criticidade" and not aggregate.empty:
+            arcs = aggregate.copy()
+            arcs["origem_lon"], arcs["origem_lat"] = FOZ_CENTER_LON, FOZ_CENTER_LAT
+            layers = [pdk.Layer("ArcLayer", data=arcs,
+                         get_source_position="[origem_lon, origem_lat]",
+                         get_target_position="[lon, lat]", get_source_color=[37, 99, 235, 140],
+                         get_target_color="rgb_color", get_width="width_px", pickable=True),
+                      pdk.Layer("ColumnLayer", data=aggregate,
+                         get_position="[lon, lat]", get_elevation="ocorrencias",
+                         elevation_scale=elevation*3, radius=90,
+                         get_fill_color="rgb_color", extruded=True, pickable=True)]
+    st.caption(f"Registros com coordenadas: {point_count}. Camadas construídas: {len(layers)}.")
+    if not layers:
+        st.warning("Não há dados para esta camada. Amplie o período, escolha Histórico ou ative HDF5 para congestionamentos.")
         return
-    deck = pdk.Deck(layers=active, initial_view_state=view_state,
-                    map_style=DECK_MAP_STYLES.get(map_style_label,"dark"), tooltip=tooltip)
-    st.pydeck_chart(deck, use_container_width=True, height=height)
+    deck = pdk.Deck(
+        layers=layers, map_provider="carto", map_style=DECK_MAP_STYLES[style],
+        show_error=True,
+        initial_view_state=pdk.ViewState(latitude=FOZ_CENTER_LAT,
+            longitude=FOZ_CENTER_LON, zoom=zoom, pitch=pitch, bearing=bearing),
+        tooltip=tooltip)
+    st.pydeck_chart(deck, use_container_width=True, height=height, key=element_key)
+    st.caption("Se houver pontos mas o fundo não carregar, confira acesso do navegador a Carto e erros do console (F12).")
 
 
 # =========================================================
@@ -1681,7 +1659,7 @@ if st.sidebar.button("🔄 ATUALIZAR DADOS AGORA", width="stretch", type="primar
 
 st.sidebar.divider()
 
-use_drive = st.sidebar.toggle("☁️ Conectar HDF5 do Drive", value=False, key="use_drive")
+use_drive = st.sidebar.toggle("☁️ Ler HDF5 do Drive", value=False, key="use_drive")
 try:
     raw_alerts_dataframe, raw_jams_dataframe = load_all_data()
 except Exception as error:
@@ -1735,12 +1713,12 @@ def classify_traffic_status(mean_speed_kmh: float) -> str:
 
 st.sidebar.divider()
 st.sidebar.subheader("🧊 Controles 3D")
-deck_map_style_label = st.sidebar.selectbox("Estilo 3D", list(DECK_MAP_STYLES), index=1, key="deck_style")
-deck_pitch = st.sidebar.slider("Inclinação (pitch)", 0, 70, 50, 5, key="deck_pitch")
-deck_bearing = st.sidebar.slider("Rotação (bearing)", -180, 180, 0, 10, key="deck_bearing")
-deck_zoom = st.sidebar.slider("Zoom 3D", 10.0, 17.0, 12.2, 0.2, key="deck_zoom")
-deck_hex_radius = st.sidebar.slider("Raio hexagonal (m)", 60, 400, 140, 20, key="deck_hex_radius")
-deck_elevation_scale = st.sidebar.slider("Escala de altura", 5, 60, 20, 5, key="deck_elev")
+deck_map_style_label = st.sidebar.selectbox("Estilo de fundo 3D", list(DECK_MAP_STYLES), index=1, key="deck_style")
+deck_pitch = st.sidebar.slider("Inclinação", 0, 70, 50, 5, key="deck_pitch")
+deck_bearing = st.sidebar.slider("Rotação", -180, 180, 0, 10, key="deck_bearing")
+deck_zoom = st.sidebar.slider("Zoom", 10.0, 17.0, 12.2, 0.2, key="deck_zoom")
+deck_hex_radius = st.sidebar.slider("Raio hexagonal (m)", 60, 400, 140, 20, key="deck_radius")
+deck_elevation_scale = st.sidebar.slider("Escala de altura", 5, 60, 20, 5, key="deck_height")
 
 st.sidebar.subheader("🔍 Filtros")
 today_foz_date = current_foz_datetime.date()
@@ -1751,7 +1729,7 @@ if not raw_alerts_dataframe.empty and "date" in raw_alerts_dataframe.columns:
 if not raw_jams_dataframe.empty and "date" in raw_jams_dataframe.columns:
     available_dates.update(pd.to_datetime(raw_jams_dataframe["date"]).dt.date.unique())
 
-available_dates = {d for d in available_dates if pd.notna(d)}
+available_dates = {date for date in available_dates if pd.notna(date)}
 if available_dates:
     minimum_available_date = min(available_dates)
     maximum_available_date = max(available_dates)
@@ -2015,7 +1993,7 @@ st.markdown(f"""
       &nbsp;·&nbsp;
       🕒 Hora local: <strong style="color:#94a3b8;">{current_foz_datetime.strftime('%H:%M:%S')}</strong>
       &nbsp;·&nbsp;
-      🔄 Atualize manualmente para consultar novos arquivos
+      🔄 Dados atualizados pelo botão na lateral
   </p>
   <div style="
       margin-top: 1rem;
@@ -2756,7 +2734,7 @@ st.subheader("🗺️ Visualizações")
         "Mapa de Calor",
         "🧊 Cidade 3D",
         "📅 Análise Temporal",
-        "🗺️ Análise Temporal Anual",
+        "🗺️ Análisis Temporal Anual",
         "Gráficos",
         "🧪 Pipeline Científico",
         "📊 Criticidade (MCDA)",
@@ -2876,75 +2854,52 @@ with tab_calor:
         st.info("Sem dados suficientes para mapa de calor.")
 
 with tab_3d:
-    st.subheader("🧊 Cidade 3D — visualização exploratória")
-    modo_3d = st.radio("Camada principal", [
-        "Densidade hexagonal", "Colunas por via", "Pontos + calor",
-        "Fluxo de congestionamento", "Arcos de criticidade",
-    ], horizontal=True, key="modo_3d")
-    usar_historico_3d = st.toggle("Usar base histórica completa", value=False, key="toggle_hist_3d")
-    base_alertas_3d = df_alerts_raw if usar_historico_3d else df_filtered
-    base_jams_3d = df_jams_raw if usar_historico_3d else df_jams_filtered
-    pontos_3d = add_severity_rgb_column(prepare_points_for_deck(base_alertas_3d))
-    view_state_3d = build_deck_view_state(zoom=deck_zoom, pitch=deck_pitch, bearing=deck_bearing)
-    col_m1, col_m2, col_m3 = st.columns(3)
-    col_m1.metric("Pontos válidos", len(pontos_3d))
-    col_m2.metric("Vias distintas", pontos_3d["street"].nunique() if not pontos_3d.empty else 0)
-    col_m3.metric("Modo", modo_3d)
-    if modo_3d == "Densidade hexagonal":
-        render_deck_scene(
-            [build_hexagon_3d_layer(pontos_3d, deck_hex_radius, deck_elevation_scale)],
-            view_state_3d, {"html": "<b>{elevationValue}</b> registros"}, deck_map_style_label)
-    elif modo_3d == "Colunas por via":
-        top_n_3d = st.slider("Vias exibidas", 5, 40, 20, 5, key="top_3d")
-        agregado_3d = aggregate_incidents_by_street_for_3d(pontos_3d, top_n_3d)
-        render_deck_scene([build_column_3d_layer(agregado_3d, deck_elevation_scale * 4)],
-                          view_state_3d, DECK_TOOLTIP_STREETS, deck_map_style_label)
-        if not agregado_3d.empty:
-            st.dataframe(agregado_3d[["street", "ocorrencias"]], hide_index=True, use_container_width=True)
-    elif modo_3d == "Pontos + calor":
-        render_deck_scene([build_heatmap_gl_layer(pontos_3d), build_scatter_3d_layer(pontos_3d)],
-                          view_state_3d, DECK_TOOLTIP_INCIDENTS, deck_map_style_label)
-    elif modo_3d == "Fluxo de congestionamento":
-        path_layer = build_jams_path_3d_layer(base_jams_3d)
-        render_deck_scene([path_layer], view_state_3d, DECK_TOOLTIP_JAMS, deck_map_style_label)
-        if path_layer is None:
-            st.caption("É necessária a coluna line com pelo menos dois pontos por congestionamento.")
+    st.subheader("🧊 Cidade 3D — exploração interativa")
+    st.caption("A aba só constrói um mapa 3D após o clique em Exibir mapa; isso evita mapas WebGL ocultos competindo pelos recursos do navegador.")
+    modo_3d = st.radio("Camada", ["Densidade hexagonal", "Colunas por via",
+                                 "Pontos + calor", "Fluxo de congestionamento",
+                                 "Arcos de criticidade"], horizontal=True, key="modo_3d")
+    hist_3d = st.toggle("Usar histórico completo", value=False, key="hist_3d")
+    base_3d = df_alerts_raw if hist_3d else df_filtered
+    jams_3d = df_jams_raw if hist_3d else df_jams_filtered
+    st.write("Alertas carregados:", len(base_3d), "· Jams carregados:", len(jams_3d))
+    if not hist_3d and base_3d.empty and not df_alerts_raw.empty:
+        st.info("O filtro de data está vazio. Ative Usar histórico completo ou escolha uma data com registros.")
+    if st.button("🗺️ Exibir mapa 3D", key="open_3d"):
+        st.session_state["show_city_3d"] = True
+    if st.session_state.get("show_city_3d", False):
+        render_3d_map(base_3d, jams_3d, modo_3d, deck_map_style_label,
+                      deck_zoom, deck_pitch, deck_bearing, deck_hex_radius,
+                      deck_elevation_scale, element_key="city3d_main")
     else:
-        agregado_3d = aggregate_incidents_by_street_for_3d(pontos_3d, 25)
-        render_deck_scene([build_arc_3d_layer(agregado_3d),
-                           build_column_3d_layer(agregado_3d, deck_elevation_scale * 3)],
-                          view_state_3d, DECK_TOOLTIP_STREETS, deck_map_style_label)
-        st.caption("Arcos representam ligações visuais com o centro de referência; não são fluxos observados.")
-
-    st.markdown("### ⏱️ Linha do tempo 3D")
-    if pontos_3d.empty or "timestamp" not in pontos_3d:
-        st.info("Sem dados temporais para animar.")
-    else:
-        pontos_anim = pontos_3d.copy()
-        pontos_anim["timestamp"] = pd.to_datetime(pontos_anim["timestamp"], errors="coerce")
-        pontos_anim = pontos_anim.dropna(subset=["timestamp"])
-        granularidade = st.selectbox("Granularidade", ["Hora", "Dia", "Semana"], key="anim_gran")
-        if granularidade == "Hora":
-            pontos_anim["bucket"] = pontos_anim["timestamp"].dt.floor("h")
-        elif granularidade == "Dia":
-            pontos_anim["bucket"] = pontos_anim["timestamp"].dt.floor("D")
+        st.info("Clique em Exibir mapa 3D para carregar esta visualização.")
+    st.divider()
+    st.subheader("⏱️ Linha do tempo 3D")
+    if st.toggle("Mostrar linha do tempo", value=False, key="show_3d_timeline"):
+        data_anim = prepare_points_for_deck(base_3d)
+        if data_anim.empty or "timestamp" not in data_anim:
+            st.info("Sem dados com coordenadas e tempo nesta seleção.")
         else:
-            pontos_anim["bucket"] = pontos_anim["timestamp"].dt.to_period("W").dt.start_time
-        buckets = sorted(pontos_anim["bucket"].unique())
-        if len(buckets) < 2:
-            st.info("Amplie o intervalo de tempo ou use o histórico para visualizar mais períodos.")
-        else:
-            bucket_idx = st.slider("Momento", 0, len(buckets)-1, 0, key="anim_slider")
-            recorte = pontos_anim[pontos_anim["bucket"].eq(buckets[bucket_idx])]
-            st.caption(f"{pd.Timestamp(buckets[bucket_idx]).strftime('%d/%m/%Y %H:%M')} · {len(recorte)} registros")
-            render_deck_scene([build_hexagon_3d_layer(recorte, deck_hex_radius, deck_elevation_scale),
-                               build_scatter_3d_layer(recorte, 60)], view_state_3d,
-                              DECK_TOOLTIP_INCIDENTS, deck_map_style_label, height=510)
-            serie = pontos_anim.groupby("bucket").size().reset_index(name="Ocorrências")
-            fig_anim = px.area(serie, x="bucket", y="Ocorrências", title="Série temporal")
-            fig_anim.add_vline(x=pd.Timestamp(buckets[bucket_idx]).timestamp() * 1000,
-                               line_color="#dc2626", line_dash="dash")
-            st.plotly_chart(fig_anim, use_container_width=True)
+            data_anim["timestamp"] = pd.to_datetime(data_anim["timestamp"], errors="coerce")
+            data_anim = data_anim.dropna(subset=["timestamp"])
+            gran = st.selectbox("Granularidade", ["Hora", "Dia", "Semana"], key="gran_3d")
+            if gran == "Semana":
+                data_anim["bucket"] = data_anim["timestamp"].dt.to_period("W").dt.start_time
+            else:
+                data_anim["bucket"] = data_anim["timestamp"].dt.floor("h" if gran == "Hora" else "D")
+            buckets = sorted(data_anim["bucket"].unique())
+            if len(buckets) < 2:
+                st.info("Selecione um período maior para ter pelo menos dois intervalos.")
+            else:
+                index = st.slider("Momento", 0, len(buckets)-1, 0, key="moment_3d")
+                moment = data_anim[data_anim["bucket"].eq(buckets[index])]
+                st.caption(f"{pd.Timestamp(buckets[index]).strftime('%d/%m/%Y %H:%M')} · {len(moment)} registros")
+                render_3d_map(moment, jams_3d, "Densidade hexagonal", deck_map_style_label,
+                              deck_zoom, deck_pitch, deck_bearing, deck_hex_radius,
+                              deck_elevation_scale, element_key="city3d_timeline", height=510)
+                serie = data_anim.groupby("bucket").size().reset_index(name="Ocorrências")
+                st.plotly_chart(px.area(serie, x="bucket", y="Ocorrências", title="Ocorrências no tempo"),
+                                use_container_width=True)
 
 with tab_temporal_danos:
     st.subheader("📅 Análise Temporal de Patologias Viárias")
@@ -2972,14 +2927,14 @@ with tab_temporal_danos:
         st.warning("Base de dados de alertas vazia ou indisponível.")
 
 with tab_temporal_anual:
-    st.subheader("🗺️ Análise Temporal Anual — Top ruas com mais buracos")
+    st.subheader("🗺️ Análisis Temporal Anual — Top ruas com mais buracos")
     st.caption(
         "Esta aba usa somente a planilha histórica de alertas para identificar, por ano, "
         "as ruas com maior número de reportes de BURACO NA VIA e exibi-las em mapa com geometrias."
     )
 
-    annual_maps_enabled = st.toggle("Gerar mapas anuais (consulta Nominatim)", value=False, key="annual_maps_enabled")
-    st.info("2026 no resumo é janeiro–agosto; a auditoria compara apenas o mesmo período.")
+    annual_maps_enabled = st.toggle("Gerar mapas anuais (Nominatim)", value=False, key="annual_maps_enabled")
+    st.info("O resumo apresenta 2026 de janeiro a agosto; totais anuais dependem da fonte CSV selecionada.")
     col_anual_1, col_anual_2 = st.columns([1, 1])
 
     with col_anual_1:
@@ -3033,40 +2988,33 @@ with tab_temporal_anual:
                         & (df_buracos_historico["timestamp"].dt.month > 8))
                 ].copy()
                 df_buracos_historico["month"] = df_buracos_historico["timestamp"].dt.month
-                mensal = (df_buracos_historico.groupby(["year", "month"])
-                          .size().reset_index(name="Ocorrências"))
+                mensal = df_buracos_historico.groupby(["year", "month"]).size().reset_index(name="Ocorrências")
                 if not mensal.empty:
                     mensal["Ano"] = mensal["year"].astype(int).astype(str)
                     fig_mensal = px.line(mensal, x="month", y="Ocorrências", color="Ano",
                                          markers=True, title="Buracos por mês — 2024–2026")
                     fig_mensal.update_xaxes(tickvals=list(range(1, 13)), ticktext=[
-                        "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago",
-                        "Set", "Out", "Nov", "Dez"])
+                        "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"])
                     st.plotly_chart(fig_mensal, use_container_width=True)
-                with st.expander("🔎 Auditoria dos números do resumo"):
+                with st.expander("🔎 Auditoria frente ao resumo"):
                     reference = {
                         2024: (7296, 5, 1460, "Avenida Paraná", 581),
                         2025: (17608, 8, 3166, "Avenida das Cataratas", 1206),
                         2026: (6168, 3, 1175, "Avenida Felipe Wandscheer", 936),
                     }
                     audit = []
-                    for yr, (total_ref, peak_month, peak_ref, road_ref, road_ref_n) in reference.items():
-                        year_base = df_buracos_historico[df_buracos_historico["year"].eq(yr)]
-                        roads = year_base["street"].fillna("N/D").astype(str).str.strip().value_counts()
-                        match = roads[roads.index.str.casefold() == road_ref.casefold()]
-                        actual_road = int(match.sum())
-                        actual_peak = int(year_base["month"].eq(peak_month).sum())
-                        actual_total = len(year_base)
-                        audit.append({
-                            "Ano": yr, "Total resumo": total_ref, "Total calculado": actual_total,
-                            "Pico resumo": peak_ref, "Pico calculado": actual_peak,
-                            "Via": road_ref, "Via resumo": road_ref_n,
-                            "Via calculada": actual_road,
-                            "Status": "OK" if (actual_total, actual_peak, actual_road)
-                                      == (total_ref, peak_ref, road_ref_n) else "REVISAR",
-                        })
+                    for year, (total_ref, peak_month, peak_ref, road_ref, road_ref_n) in reference.items():
+                        year_frame = df_buracos_historico[df_buracos_historico["year"].eq(year)]
+                        counts = year_frame["street"].fillna("N/D").astype(str).str.strip().value_counts()
+                        actual_road = int(counts[counts.index.str.casefold() == road_ref.casefold()].sum())
+                        peak_actual = int(year_frame["month"].eq(peak_month).sum())
+                        audit.append({"Ano": year, "Total resumo": total_ref, "Total calculado": len(year_frame),
+                                      "Pico resumo": peak_ref, "Pico calculado": peak_actual,
+                                      "Via": road_ref, "Via resumo": road_ref_n, "Via calculada": actual_road,
+                                      "Status": "OK" if (len(year_frame), peak_actual, actual_road)
+                                               == (total_ref, peak_ref, road_ref_n) else "REVISAR"})
                     st.dataframe(pd.DataFrame(audit), hide_index=True, use_container_width=True)
-                    st.caption("Não substitua contagens calculadas por números fixos: investigue base, cobertura, datas e duplicatas.")
+                    st.caption("Se houver divergências, confira arquivo-fonte, datas, duplicatas e grafias das vias.")
 
                 anos_disponiveis_historico = sorted(
                     df_buracos_historico["year"].dropna().astype(int).unique().tolist()
