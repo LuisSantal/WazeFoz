@@ -12,6 +12,7 @@ matplotlib
 seaborn
 pydeck>=0.9.1
 streamlit-plotly-events>=0.0.6
+streamlit-autorefresh>=1.0.1
 
 
 
