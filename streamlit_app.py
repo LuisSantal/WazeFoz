@@ -449,7 +449,7 @@ def normalize_timestamps(df: pd.DataFrame) -> pd.DataFrame:
 
     if "pubMillis" in normalized_dataframe.columns:
         normalized_dataframe["timestamp"] = (
-            pd.to_datetime(normalized_dataframe["pubMillis"], unit="ms", utc=True)
+            pd.to_datetime(normalized_dataframe["pubMillis"], unit="ms", utc=True, errors="coerce")
             .dt.tz_convert("America/Sao_Paulo")
             .dt.tz_localize(None)
         )
@@ -476,8 +476,9 @@ def normalize_timestamps(df: pd.DataFrame) -> pd.DataFrame:
                 )
                 break
         else:
-            normalized_dataframe["timestamp"] = now_foz()
+            normalized_dataframe["timestamp"] = pd.NaT
 
+    normalized_dataframe["timestamp"] = pd.to_datetime(normalized_dataframe["timestamp"], errors="coerce")
     normalized_dataframe["date"] = normalized_dataframe["timestamp"].dt.date
     normalized_dataframe["hour"] = normalized_dataframe["timestamp"].dt.hour
     normalized_dataframe["day_of_week"] = normalized_dataframe["timestamp"].dt.day_name()
@@ -2564,7 +2565,7 @@ st.subheader("🗺️ Visualizações")
         "Congestionamentos",
         "Mapa de Calor",
         "📅 Análise Temporal",
-        "🗺️ Análisis Temporal Anual",
+        "🗺️ Análise Temporal Anual",
         "Gráficos",
         "🧪 Pipeline Científico",
         "📊 Criticidade (MCDA)",
@@ -2636,9 +2637,9 @@ with tab_calor:
         if {"lat", "lon"}.issubset(df_heat.columns):
             df_heat = df_heat.dropna(subset=["lat", "lon"])
             df_heat = df_heat[
-    df_heat["lat"].between(FOZ_LATITUDE_MIN, FOZ_LATITUDE_MAX) &
-    df_heat["lon"].between(FOZ_LONGITUDE_MIN, FOZ_LONGITUDE_MAX)
-]
+                df_heat["lat"].between(FOZ_LATITUDE_MIN, FOZ_LATITUDE_MAX)
+                & df_heat["lon"].between(FOZ_LONGITUDE_MIN, FOZ_LONGITUDE_MAX)
+            ]
 
             if not df_heat.empty:
                 m_heat = folium.Map(
@@ -2690,7 +2691,7 @@ with tab_temporal_danos:
     """)
     if not df_alerts_raw.empty:
         subtipos = get_clean_unique_values(df_alerts_raw["subtype"], invalid_values=["nan", ""])
-        subtipo_sel = st.selectbox("Selecione a natureza do dano:", subtipos, key="sel_dano_temporal")
+        subtipo_sel = st.selectbox("Selecione a natureza do dano:", subtipos or ["(Sem dados)"], key="sel_dano_temporal")
 
         df_sub = df_alerts_raw[df_alerts_raw["subtype"] == subtipo_sel]
         if not df_sub.empty:
@@ -2708,8 +2709,9 @@ with tab_temporal_danos:
     else:
         st.warning("Base de dados de alertas vazia ou indisponível.")
 
+# Diagnóstico de sintaxe e dados: o código do app é compilado em CI antes do deploy.
 with tab_temporal_anual:
-    st.subheader("🗺️ Análisis Temporal Anual — Top ruas com mais buracos")
+    st.subheader("🗺️ Análise Temporal Anual — Top ruas com mais buracos")
     st.caption(
         "Esta aba usa somente a planilha histórica de alertas para identificar, por ano, "
         "as ruas com maior número de reportes de BURACO NA VIA e exibi-las em mapa com geometrias."
@@ -2735,6 +2737,7 @@ with tab_temporal_anual:
             key="annual_top_streets_slider"
         )
 
+    st.info("A análise anual lê a planilha histórica configurada. Confira sua cobertura antes de comparar com os totais do resumo; 2026 é parcial até agosto.")
     try:
         df_alertas_planilha_anual = load_alert_spreadsheet_for_annual_analysis(LOCAL_ALERT_CSV_PATH)
     except FileNotFoundError:
@@ -3628,3 +3631,4 @@ footer_html = f"""
 </div>
 """
 st.markdown(footer_html, unsafe_allow_html=True)
+
