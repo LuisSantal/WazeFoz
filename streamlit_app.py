@@ -1335,7 +1335,7 @@ def generate_heatmap(dataframe_json: str) -> folium.Map | None:
 
 
 # =========================================================
-# BLOCO 3B — VISUALIZAÇÃO 3D (renderiza somente quando solicitada)
+# BLOCO 3B — VISUALIZAÇÃO 3D SOB DEMANDA
 # =========================================================
 FOZ_CENTER_LAT, FOZ_CENTER_LON = -25.545, -54.585
 DECK_MAP_STYLES = {"Claro": "light", "Escuro": "dark", "Ruas": "road"}
@@ -2723,9 +2723,7 @@ st.subheader("🗺️ Visualizações")
     tab_temporal_danos,
     tab_temporal_anual,
     tab_graficos,
-    tab_pipeline,
     tab_criticidade,
-    tab_predicao,
     tab_dados
 ) = st.tabs(
     [
@@ -2736,9 +2734,7 @@ st.subheader("🗺️ Visualizações")
         "📅 Análise Temporal",
         "🗺️ Análisis Temporal Anual",
         "Gráficos",
-        "🧪 Pipeline Científico",
         "📊 Criticidade (MCDA)",
-        "🔮 Modelo Preditivo",
         "Dados"
     ]
 )
@@ -2855,16 +2851,16 @@ with tab_calor:
 
 with tab_3d:
     st.subheader("🧊 Cidade 3D — exploração interativa")
-    st.caption("A aba só constrói um mapa 3D após o clique em Exibir mapa; isso evita mapas WebGL ocultos competindo pelos recursos do navegador.")
+    st.caption("O mapa 3D é construído após o clique em Exibir mapa, reduzindo o carregamento de mapas WebGL em abas ocultas.")
     modo_3d = st.radio("Camada", ["Densidade hexagonal", "Colunas por via",
                                  "Pontos + calor", "Fluxo de congestionamento",
                                  "Arcos de criticidade"], horizontal=True, key="modo_3d")
     hist_3d = st.toggle("Usar histórico completo", value=False, key="hist_3d")
     base_3d = df_alerts_raw if hist_3d else df_filtered
     jams_3d = df_jams_raw if hist_3d else df_jams_filtered
-    st.write("Alertas carregados:", len(base_3d), "· Jams carregados:", len(jams_3d))
+    st.write("Alertas carregados:", len(base_3d), "· Congestionamentos carregados:", len(jams_3d))
     if not hist_3d and base_3d.empty and not df_alerts_raw.empty:
-        st.info("O filtro de data está vazio. Ative Usar histórico completo ou escolha uma data com registros.")
+        st.info("Filtro de data vazio. Ative o histórico completo ou selecione uma data com registros.")
     if st.button("🗺️ Exibir mapa 3D", key="open_3d"):
         st.session_state["show_city_3d"] = True
     if st.session_state.get("show_city_3d", False):
@@ -3297,103 +3293,6 @@ with tab_graficos:
     else:
         st.info("Sem incidentes para gerar gráficos no recorte atual.")
 
-with tab_pipeline:
-    st.subheader("🧪 Pipeline Científico para o Artigo")
-    st.caption("Geração de séries, decomposição STL, detecção de rupturas (PELT) e tabelas descritivas para apoio à redação acadêmica.")
-
-    col_p1, col_p2, col_p3 = st.columns(3)
-    categorias_disp = ["TODOS"]
-    if not df_alerts_raw.empty and "type" in df_alerts_raw.columns:
-        categorias_disp += sorted(df_alerts_raw["type"].dropna().astype(str).unique().tolist())
-    categorias_disp = list(dict.fromkeys(categorias_disp + ["CONGESTIONAMENTO"]))
-
-    with col_p1:
-        categoria_artigo = st.selectbox("Categoria analisada", categorias_disp, index=0, key="pipe_categoria")
-    with col_p2:
-        periodo_stl = st.selectbox("Periodicidade STL", [7, 30], index=0, key="pipe_stl_period")
-    with col_p3:
-        penalidade_pelt = st.slider("Penalidade PELT", min_value=1.0, max_value=20.0, value=5.0, step=0.5, key="pipe_pelt_pen")
-
-    serie = build_daily_series(
-    df_alerts_raw,
-    df_jams_raw,
-    selected_category=categoria_artigo
-)
-
-    if serie.empty:
-        st.info("Sem dados suficientes para montar a série temporal.")
-    else:
-        st.markdown("### Série diária")
-        df_serie = serie.reset_index()
-        df_serie.columns = ["Data", "Ocorrências"]
-
-        fig_ts = px.line(
-            df_serie,
-            x="Data",
-            y="Ocorrências",
-            title=f"Série diária de ocorrências — {categoria_artigo}",
-            markers=False
-        )
-        fig_ts.update_layout(height=360)
-        st.plotly_chart(fig_ts, use_container_width=True)
-
-        st.markdown("### Decomposição STL")
-        res_stl = run_stl_analysis(serie, period=periodo_stl)
-
-        if res_stl is not None:
-            from plotly.subplots import make_subplots
-            import plotly.graph_objects as go
-
-            fig_stl = make_subplots(
-                rows=4, cols=1, shared_xaxes=True,
-                subplot_titles=["Observed", "Trend", "Seasonal", "Residual"],
-                vertical_spacing=0.04
-            )
-            x_vals = serie.index
-
-            fig_stl.add_trace(go.Scatter(x=x_vals, y=res_stl.observed, name="Observed", line=dict(color="#2563EB")), row=1, col=1)
-            fig_stl.add_trace(go.Scatter(x=x_vals, y=res_stl.trend, name="Trend", line=dict(color="#DC2626")), row=2, col=1)
-            fig_stl.add_trace(go.Scatter(x=x_vals, y=res_stl.seasonal, name="Seasonal", line=dict(color="#16A34A")), row=3, col=1)
-            fig_stl.add_trace(go.Scatter(x=x_vals, y=res_stl.resid, name="Residual", mode="lines", line=dict(color="#7C3AED")), row=4, col=1)
-
-            fig_stl.update_layout(height=900, showlegend=False, title=f"STL — {categoria_artigo} (period={periodo_stl})")
-            st.plotly_chart(fig_stl, use_container_width=True)
-        else:
-            st.warning("Não foi possível executar a STL. Verifique se `statsmodels` está instalado.")
-
-        st.markdown("### Rupturas estruturais — PELT")
-        bkps = run_pelt_analysis(serie, model="l2", min_size=7, jump=1, pen=penalidade_pelt)
-
-        fig_pelt = px.line(df_serie, x="Data", y="Ocorrências", title="Mudanças estruturais detectadas por PELT")
-        for b in bkps[:-1]:
-            if 0 <= b - 1 < len(df_serie):
-                data_bkp = df_serie.iloc[b - 1]["Data"]
-                fig_pelt.add_vline(x=data_bkp, line_dash="dash", line_color="red")
-        fig_pelt.update_layout(height=360)
-        st.plotly_chart(fig_pelt, use_container_width=True)
-
-        if bkps:
-            datas_ruptura = []
-            for b in bkps[:-1]:
-                if 0 <= b - 1 < len(df_serie):
-                    datas_ruptura.append(pd.to_datetime(df_serie.iloc[b - 1]["Data"]).strftime("%Y-%m-%d"))
-            st.write("Datas estimadas de ruptura:", datas_ruptura if datas_ruptura else "Nenhuma ruptura relevante.")
-
-    st.markdown("---")
-    st.markdown("### Tabela 1 — Estatísticas descritivas")
-    tabela_desc = build_descriptive_table(df_alerts_raw, df_jams_raw)
-    if not tabela_desc.empty:
-        st.dataframe(tabela_desc, hide_index=True, use_container_width=True)
-        csv_desc = tabela_desc.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "Baixar CSV — Tabela 1",
-            data=csv_desc,
-            file_name="tabela_1_estatisticas_descritivas.csv",
-            mime="text/csv"
-        )
-    else:
-        st.info("Sem dados suficientes para a tabela descritiva.")
-
 with tab_criticidade:
     st.subheader("📊 Classificação Hierárquica de Infraestrutura Viária Crítica")
     st.markdown("""
@@ -3432,307 +3331,6 @@ with tab_criticidade:
             )
     else:
         st.info("Dados insuficientes para o ranking multicritério.")
-
-with tab_predicao:
-    st.subheader("🔮 Simulador Preditivo de Impacto e Propensão ao Congestionamento")
-    st.markdown("""
-    Combinação de **regressão inferencial** (impacto temporal por extensão de fila) com análise histórica de
-    **propensão ao congestionamento por via e dia da semana**, fundamentada nos dados reais do dataset WazeFoz.
-    """)
-
-    st.markdown("### 🧮 Simulador de Atraso por Extensão de Fila")
-    col_p1, col_p2 = st.columns(2)
-
-    with col_p1:
-        extensao_sim = st.slider("Extensão da fila (metros):", 50, 5000, 500, 50, key="slider_pred_ext")
-        atraso_est = predict_traffic_delay_impact(extensao_sim)
-        minutos_est = atraso_est / 60
-        st.metric("Atraso Estimado", f"{minutos_est:.2f} min")
-        st.caption("Fórmula: *Atraso (s) = Comprimento × 0,15 + 12*")
-
-    with col_p2:
-        sim_x = np.linspace(50, 5000, 100)
-        sim_y = [predict_traffic_delay_impact(l) / 60 for l in sim_x]
-        df_sim = pd.DataFrame({"Comprimento (m)": sim_x, "Atraso Estimado (min)": sim_y})
-
-        fig_pred = px.line(
-            df_sim,
-            x="Comprimento (m)",
-            y="Atraso Estimado (min)",
-            title="Curva de Impacto: Extensão de Fila vs Atraso"
-        )
-        fig_pred.add_scatter(
-            x=[extensao_sim],
-            y=[minutos_est],
-            mode="markers+text",
-            name="Cenário atual",
-            text=["◀ Selecionado"],
-            textposition="top right",
-            marker=dict(size=12, color="red")
-        )
-        st.plotly_chart(fig_pred, use_container_width=True)
-
-    st.markdown("---")
-    st.markdown("### 📅 Vias com Maior Propensão ao Congestionamento por Dia da Semana")
-    st.caption("Baseado no histórico completo de congestionamentos carregados — independente do filtro de data.")
-
-    DIAS_PT_PRED = {
-        "Monday": "Segunda",
-        "Tuesday": "Terça",
-        "Wednesday": "Quarta",
-        "Thursday": "Quinta",
-        "Friday": "Sexta",
-        "Saturday": "Sábado",
-        "Sunday": "Domingo"
-    }
-    ORDEM_DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
-
-    df_jams_hist = df_jams_raw.copy() if not df_jams_raw.empty else pd.DataFrame()
-
-    if not df_jams_hist.empty and "street" in df_jams_hist.columns and "day_of_week" in df_jams_hist.columns:
-        df_jams_hist = df_jams_hist[
-            df_jams_hist["street"].notna() &
-            (~df_jams_hist["street"].isin(["NA", "nan", "Via", ""]))
-        ].copy()
-        df_jams_hist["Dia"] = df_jams_hist["day_of_week"].map(DIAS_PT_PRED)
-
-        top_vias_pred = df_jams_hist["street"].value_counts().head(15).index.tolist()
-        df_prop = df_jams_hist[df_jams_hist["street"].isin(top_vias_pred)]
-
-        heatmap_data = (
-            df_prop.groupby(["street", "Dia"]).size()
-            .reset_index(name="Ocorrências")
-        )
-
-        total_por_via = heatmap_data.groupby("street")["Ocorrências"].transform("sum")
-        heatmap_data["Propensão (%)"] = (heatmap_data["Ocorrências"] / total_por_via * 100).round(1)
-
-        col_h1, col_h2 = st.columns([3, 2])
-
-        with col_h1:
-            pivot = heatmap_data.pivot_table(
-                index="street",
-                columns="Dia",
-                values="Propensão (%)",
-                aggfunc="sum"
-            ).reindex(columns=[d for d in ORDEM_DIAS if d in heatmap_data["Dia"].unique()], fill_value=0)
-
-            fig_heat = px.imshow(
-                pivot,
-                color_continuous_scale="YlOrRd",
-                aspect="auto",
-                title="Mapa de Propensão: Via × Dia da Semana (% de ocorrências históricas)",
-                labels={"color": "Propensão (%)", "x": "Dia", "y": "Via"}
-            )
-            fig_heat.update_layout(height=480)
-            st.plotly_chart(fig_heat, use_container_width=True)
-
-        with col_h2:
-            st.markdown("#### 🔎 Filtro por Dia da Semana")
-            dia_selecionado = st.selectbox(
-                "Ver vias mais propensas em:",
-                ORDEM_DIAS,
-                key="pred_dia"
-            )
-
-            df_dia = heatmap_data[heatmap_data["Dia"] == dia_selecionado].sort_values(
-                "Propensão (%)", ascending=False
-            ).head(10)
-
-            if not df_dia.empty:
-                fig_dia = px.bar(
-                    df_dia,
-                    x="Propensão (%)",
-                    y="street",
-                    orientation="h",
-                    color="Propensão (%)",
-                    color_continuous_scale="Reds",
-                    title=f"Top 10 — {dia_selecionado}",
-                    labels={"street": "Via", "Propensão (%)": "% do tráfego semanal"}
-                )
-                fig_dia.update_layout(height=380, coloraxis_showscale=False)
-                st.plotly_chart(fig_dia, use_container_width=True)
-            else:
-                st.info(f"Sem dados históricos para {dia_selecionado}.")
-
-        st.markdown("#### 📋 Pior Dia da Semana por Via")
-        pior_dia = (
-            heatmap_data.loc[heatmap_data.groupby("street")["Propensão (%)"].idxmax()]
-            [["street", "Dia", "Propensão (%)", "Ocorrências"]]
-            .sort_values("Ocorrências", ascending=False)
-            .head(15)
-            .reset_index(drop=True)
-        )
-
-        st.dataframe(
-            pior_dia,
-            hide_index=True,
-            column_config={
-                "street": "Via / Avenida",
-                "Dia": "Pior Dia",
-                "Propensão (%)": "% no Dia",
-                "Ocorrências": "Total de Registros"
-            }
-        )
-    else:
-        st.info("Histórico de congestionamentos insuficiente para análise de propensão por via e dia.")
-
-    st.markdown("---")
-    st.markdown("### 📆 Comparador Mensal: 2025 vs 2026")
-    st.caption("Selecione um dia da semana e uma categoria para comparar a evolução mês a mês entre os dois anos.")
-
-    MESES_PT = {
-        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
-        5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
-        9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
-    }
-    DIAS_PT_CMP = {
-        "Monday": "Segunda",
-        "Tuesday": "Terça",
-        "Wednesday": "Quarta",
-        "Thursday": "Quinta",
-        "Friday": "Sexta",
-        "Saturday": "Sábado",
-        "Sunday": "Domingo"
-    }
-
-    frames_cmp = []
-
-    if not df_alerts_raw.empty:
-        df_a_cmp = df_alerts_raw.copy()
-        df_a_cmp["categoria"] = df_a_cmp.get("type", pd.Series("ALERTA", index=df_a_cmp.index))
-        df_a_cmp["origem"] = "alerta"
-        frames_cmp.append(df_a_cmp[[c for c in ["timestamp", "categoria", "origem", "street", "day_of_week"] if c in df_a_cmp.columns]])
-
-    if not df_jams_raw.empty:
-        df_j_cmp = df_jams_raw.copy()
-        df_j_cmp["categoria"] = "CONGESTIONAMENTO"
-        df_j_cmp["origem"] = "jams"
-        frames_cmp.append(df_j_cmp[[c for c in ["timestamp", "categoria", "origem", "street", "day_of_week"] if c in df_j_cmp.columns]])
-
-    if frames_cmp:
-        df_cmp_all = pd.concat(frames_cmp, ignore_index=True)
-        df_cmp_all["timestamp"] = pd.to_datetime(df_cmp_all["timestamp"], errors="coerce")
-        df_cmp_all = df_cmp_all.dropna(subset=["timestamp"])
-        df_cmp_all["ano"] = df_cmp_all["timestamp"].dt.year
-        df_cmp_all["mes"] = df_cmp_all["timestamp"].dt.month
-        df_cmp_all["Dia"] = df_cmp_all["day_of_week"].map(DIAS_PT_CMP) if "day_of_week" in df_cmp_all.columns else "Todos"
-        df_cmp_all["mes_nome"] = df_cmp_all["mes"].map(MESES_PT)
-
-        anos_disp = sorted(df_cmp_all["ano"].dropna().unique().astype(int).tolist())
-        cats_disp = sorted(df_cmp_all["categoria"].dropna().unique().tolist())
-        dias_disp = ["Todos"] + ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
-
-        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
-
-        with col_c1:
-            ano_a = st.selectbox("Ano A:", anos_disp, index=0, key="cmp_ano_a")
-        with col_c2:
-            ano_b_opts = [a for a in anos_disp if a != ano_a]
-            ano_b = st.selectbox("Ano B:", ano_b_opts if ano_b_opts else anos_disp, key="cmp_ano_b")
-        with col_c3:
-            dia_cmp = st.selectbox("Dia da Semana:", dias_disp, key="cmp_dia")
-        with col_c4:
-            cat_cmp = st.multiselect(
-                "Categorias:",
-                cats_disp,
-                default=cats_disp[:3] if len(cats_disp) >= 3 else cats_disp,
-                key="cmp_cat"
-            )
-
-        df_f = df_cmp_all[df_cmp_all["categoria"].isin(cat_cmp)] if cat_cmp else df_cmp_all.copy()
-        if dia_cmp != "Todos":
-            df_f = df_f[df_f["Dia"] == dia_cmp]
-
-        df_ano_a = df_f[df_f["ano"] == ano_a]
-        df_ano_b = df_f[df_f["ano"] == ano_b]
-
-        def agg_mensal(df_in, ano_label):
-            if df_in.empty:
-                return pd.DataFrame(columns=["mes", "mes_nome", "Total", "Ano"])
-            grp = df_in.groupby(["mes", "mes_nome", "categoria"]).size().reset_index(name="Total")
-            grp["Ano"] = str(ano_label)
-            return grp
-
-        res_a = agg_mensal(df_ano_a, ano_a)
-        res_b = agg_mensal(df_ano_b, ano_b)
-        df_comp = pd.concat([res_a, res_b], ignore_index=True)
-
-        if not df_comp.empty:
-            df_comp = df_comp.sort_values("mes")
-            ordem_meses = [MESES_PT[m] for m in sorted(df_comp["mes"].unique())]
-
-            total_mes = df_comp.groupby(["mes", "mes_nome", "Ano"])["Total"].sum().reset_index()
-            total_mes = total_mes.sort_values("mes")
-
-            fig_linha = px.line(
-                total_mes,
-                x="mes_nome",
-                y="Total",
-                color="Ano",
-                markers=True,
-                title=f"Evolução Mensal Total — {ano_a} vs {ano_b}" + (f" · {dia_cmp}" if dia_cmp != "Todos" else ""),
-                labels={"mes_nome": "Mês", "Total": "Nº Ocorrências", "Ano": "Ano"},
-                color_discrete_map={str(ano_a): "#2563EB", str(ano_b): "#DC2626"},
-                category_orders={"mes_nome": ordem_meses}
-            )
-            fig_linha.update_layout(height=380)
-            st.plotly_chart(fig_linha, use_container_width=True)
-
-            fig_bar = px.bar(
-                df_comp,
-                x="mes_nome",
-                y="Total",
-                color="Ano",
-                facet_col="categoria",
-                facet_col_wrap=3,
-                barmode="group",
-                title="Comparativo por Categoria e Mês",
-                labels={"mes_nome": "Mês", "Total": "Ocorrências"},
-                color_discrete_map={str(ano_a): "#2563EB", str(ano_b): "#DC2626"},
-                category_orders={"mes_nome": ordem_meses}
-            )
-            fig_bar.update_layout(height=420)
-            fig_bar.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
-            st.plotly_chart(fig_bar, use_container_width=True)
-
-            st.markdown("#### 📈 Variação Percentual Mês a Mês (Crescimento / Decrescimento)")
-            pivot_var = total_mes.pivot_table(index="mes_nome", columns="Ano", values="Total").reindex(ordem_meses)
-            pivot_var.columns = [str(c) for c in pivot_var.columns]
-            col_a_str, col_b_str = str(ano_a), str(ano_b)
-
-            if col_a_str in pivot_var.columns and col_b_str in pivot_var.columns:
-                pivot_var["Variação (%)"] = (
-                    (pivot_var[col_b_str] - pivot_var[col_a_str]) / pivot_var[col_a_str].replace(0, np.nan) * 100
-                ).round(1)
-                pivot_var = pivot_var.reset_index()
-                pivot_var["Cor"] = pivot_var["Variação (%)"].apply(lambda v: "Aumento 📈" if v >= 0 else "Redução 📉")
-
-                fig_var = px.bar(
-                    pivot_var.dropna(subset=["Variação (%)"]),
-                    x="mes_nome",
-                    y="Variação (%)",
-                    color="Cor",
-                    color_discrete_map={"Aumento 📈": "#DC2626", "Redução 📉": "#16A34A"},
-                    title=f"Variação % de {ano_a} → {ano_b} por Mês",
-                    labels={"mes_nome": "Mês", "Variação (%)": "Variação (%)"},
-                    text="Variação (%)",
-                    category_orders={"mes_nome": ordem_meses}
-                )
-                fig_var.update_traces(texttemplate="%{text}%", textposition="outside")
-                fig_var.add_hline(y=0, line_dash="dash", line_color="gray")
-                fig_var.update_layout(height=360, showlegend=True)
-                st.plotly_chart(fig_var, use_container_width=True)
-
-            st.markdown("#### 📋 Tabela Resumo Comparativa")
-            tbl = pivot_var[["mes_nome", col_a_str, col_b_str, "Variação (%)"]].copy() if "Variação (%)" in pivot_var.columns else pivot_var
-            if "Variação (%)" in tbl.columns:
-                tbl.columns = ["Mês", str(ano_a), str(ano_b), "Δ (%)"]
-            st.dataframe(tbl, hide_index=True, use_container_width=True)
-        else:
-            st.info("Sem dados suficientes para o comparativo mensal com os filtros selecionados.")
-    else:
-        st.info("Nenhum dado histórico disponível para comparação.")
 
 with tab_dados:
     st.subheader("Tabela de Incidentes")
