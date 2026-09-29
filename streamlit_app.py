@@ -469,13 +469,14 @@ def normalize_timestamps(df: pd.DataFrame) -> pd.DataFrame:
             "datahora",
             "data_hora",
         ]:
-            if alternative_timestamp_column in normalized_dataframe.columns:
-                normalized_dataframe["timestamp"] = pd.to_datetime(
-                    normalized_dataframe[alternative_timestamp_column],
-                    errors="coerce",
-                    dayfirst=True
-                )
-                break
+if alternative_timestamp_column in normalized_dataframe.columns:
+    normalized_dataframe["timestamp"] = pd.to_datetime(
+        normalized_dataframe[alternative_timestamp_column],
+        errors="coerce",
+        dayfirst=True,
+        format="mixed",
+    )
+    break
         else:
             normalized_dataframe["timestamp"] = pd.NaT
 
