@@ -16,7 +16,7 @@ from folium import plugins
 from streamlit_folium import st_folium
 from folium.plugins import MarkerCluster
 import pydeck as pdk
-
+from streamlit_autorefresh import st_autorefresh
 # =========================================================
 # BLOCO 1 — CONFIGURAÇÃO BASE DO APP
 # =========================================================
@@ -27,7 +27,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
+st_autorefresh(interval=600_000, key="ciclo_10min")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
