@@ -1,116 +1,134 @@
-# 🚦 WazeFoz: Sistema de Suporte à Decisão e Auditoria de Infraestrutura Viária — Foz do Iguaçu
+# 🚦 WazeFoz — Análise da Mobilidade Urbana em Foz do Iguaçu
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge.svg)](https://wazefoz.streamlit.app/)
-[![License: MIT](https://img.shields.shields.shields.org/badge/License-MIT-blue.svg)](LICENSE)
-[![Python Version](https://img.shields.shields.io/badge/Python-3.11%20%7C%203.12-blue)](https://www.python.org/downloads/)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/downloads/)
 
-> **WazeFoz** é a arquitetura algorítmica e computacional *open-source* implantada na plataforma web  ([wazefoz.streamlit.app](https://wazefoz.streamlit.app/)). O sistema opera como um Sistema de Apoio à Decisão (SAD) voltado à gestão de ativos viários, mapeamento de estrangulamentos de fluxo e comprovação técnica de prioridades para intervenções físicas e engenharia geométrica em Foz do Iguaçu (PR).
+> Plataforma de pesquisa para explorar, visualizar e comparar registros colaborativos de mobilidade urbana em Foz do Iguaçu, Paraná.
 
-***
+**Aplicação web:** [wazefoz.streamlit.app](https://wazefoz.streamlit.app/)
 
-## 🏛️ Vínculo Institucional e Fomento
+O WazeFoz organiza registros de alertas viários e congestionamentos associados ao programa Waze for Cities. O dashboard permite examinar ocorrências por período, categoria e via, identificar concentrações espaciais e comparar padrões históricos. A análise de **buracos na via** é o recorte detalhado da pesquisa apresentada no EICTI 2026.
 
-Este projeto é desenvolvido no âmbito do **Plano de Trabalho PID4021-2025**, programa de bolsas de iniciação científica do **CNPq**, intitulado:
+Os mapas e indicadores oferecem **apoio exploratório à decisão**: ajudam a localizar questões que merecem investigação, mas não substituem inspeções de campo, dados institucionais ou avaliações de engenharia.
 
-> *"Exploração de Dados Disponíveis na Plataforma Waze Partner Hub para Análise de Mobilidade Urbana"*
+## Pesquisa e equipe
 
-| Diretriz | Informações Estruturais do Projeto |
+O projeto está vinculado ao plano de trabalho **PID 4021-2025**, *“Exploração de Dados Disponíveis na Plataforma Waze Partner Hub para Análise de Mobilidade Urbana”*, desenvolvido na Universidade Federal da Integração Latino-Americana (UNILA), com bolsa de iniciação científica financiada pelo CNPq.
+
+| Participação | Pessoa |
 |---|---|
-| **Bolsista** | Luis Enrique Santacruz Alvarez |
-| **Orientador** | Prof. Diego Moraes Flores |
-| **Coorientador** | Prof. Dr. Ricardo Morel Hartmann |
-| **Instituição** | [Universidade Federal da Integração Latino-Americana (UNILA)](https://portal.unila.edu.br) |
-| **Instituto** | [ILATIT — Instituto Latino-Americano de Tecnologia, Infraestrutura e Território](https://portal.unila.edu.br/institutos/ilatit) |
-| **Grande Área** | Ciências Exatas e da Terra / Geociências — Geocartografia |
-| **Suporte** | [LACA — Laboratório de Computação Aplicada](https://divulga.unila.edu.br/laca/) (Itaipu Parquetec) |
-| **Coordenadores LACA** | Profs. Joylan Nunes Maciel, Willian Zalewski e Marcelo Kapp |
-| **Status** | 🟡 Em andamento |
+| Bolsista | Luis Enrique Santacruz Alvarez |
+| Colaborador | Joylan Nunes Maciel |
+| Coorientador | Ricardo Morel Hartmann |
+| Orientador | Diego Moraes Flores |
 
-***
+## Objetivos
 
-## 🎯 Objetivos do Projeto
+- Organizar registros de incidentes viários e congestionamentos em formatos adequados à análise.
+- Investigar padrões de ocorrência no tempo e no espaço.
+- Identificar períodos de maior frequência e vias com mais registros.
+- Apresentar resultados em gráficos, tabelas e mapas interativos.
+- Apoiar a definição de prioridades **para inspeção e estudos posteriores**.
 
-O projeto realiza a extração, normalização e reprocessamento matemático dos fluxos massivos do programa **Waze for Cities Data** (antigo *Waze Partner Hub*) para compreender os padrões de mobilidade urbana em regiões transfronteiriças. Os objetivos específicos são:
+## Funcionalidades
 
-- 📌 **Mapeamento de Dados:** Estruturar os schemas de dados geoespaciais disponíveis (alertas pontuais e retenções lineares).
-- 📊 **Auditoria Funcional:** Identificar padrões de congestionamento crônicos e eixos de estresse estrutural na malha.
-- 🗺️ **Visualização Avançada:** Desenvolver interfaces cartográficas interativas de alta fidelidade para interpretação ágil de gargalos.
-- 🤖 **Tomada de Decisão Científica:** Implementar algoritmos de análise multicritério (MCDA) e modelos preditivos de engenharia de tráfego.
+A disponibilidade de algumas visualizações depende dos arquivos carregados e da configuração do Google Drive.
 
-***
+### Mapas e exploração temporal
 
-## 🌍 Aplicações Práticas dos Resultados
+- Visualização de alertas pontuais, incluindo acidentes, perigos, obras e buracos.
+- Visualização das geometrias de congestionamento quando a base contém a coluna `line`.
+- Filtros por data, horário, categoria e via.
+- Mapa de concentração de ocorrências.
+- Exploração em 2D e visualizações 3D de densidade ou quantidade de registros.
 
-Como uma plataforma de código aberto, o sistema fornece insumos quantitativos para diferentes esferas:
+No mapa 3D, a altura das colunas representa **volume de registros**, não edifícios reais. Arcos visuais não representam trajetos ou fluxos efetivamente observados.
 
-- 🏙️ **Gestão Pública de Trânsito** — Embasamento técnico e comprovação de prioridades para intervenções geométricas, semafóricas e sinalização.
-- 🏗️ **Planejamento de Infraestrutura Viária** — Identificação de trechos em fadiga operacional para justificar duplicações e recapeamento asfáltico.
-- 🎓 **Pesquisa Acadêmica** — Modelagem e análise de séries temporais aplicadas à mobilidade pendular internacional na Tríplice Fronteira.
-- 📦 **Logística e Segurança** — Otimização de eixos logísticos com base no impacto de atraso acumulado e taxas de acidentes.
+### Análise anual de buracos
 
-***
+- Comparação mensal dos registros de 2024, 2025 e 2026.
+- Ranking das vias com mais registros em cada ano.
+- Tabelas e mapas para inspeção dos resultados.
+- Conferência entre valores calculados a partir dos arquivos disponíveis e os valores apresentados no resumo da pesquisa.
 
-## 🌟 Funcionalidades e Arquitetura do SAD
+**Atenção:** os resultados de 2026 apresentados no resumo abrangem **janeiro a agosto**. Esse período parcial não deve ser tratado como um ano completo em comparações diretas.
 
-### 🗺️ Camadas Cartográficas Dinâmicas (Módulo Descritivo)
-- **Mapa de Incidentes:** Georreferenciamento de sinistros, obras e perigos na via com marcadores coloridos por nível de criticidade e popups geoespaciais detalhados via Folium.
-- **Mapa de Congestionamentos:** Renderização linear dos segmentos viários com escala dinâmica de saturação baseada na velocidade real aferida (🟢 livre $\rightarrow$ 🔴 travado).
-- **Mapa de Calor:** Superfície contínua de Densidade de Kernel para delimitação geoestatística de *hotspots* críticos.
-- **Controles Integrados:** Captura de posição do cursor em tempo real, botão fullscreen e bounding box restrita estritamente às coordenadas do município de Foz do Iguaçu ($[-25.70, -25.40]$ Lat, $[-54.75, -54.45]$ Lon).
+### Criticidade viária
 
-### 📊 Análise de Criticidade Viária Multicritério (Módulo Analítico MCDA)
-Algoritmo de suporte à decisão que roda no backend (`calculate_road_criticism`) combinando o **volume acumulado de congestionamentos** e o **atraso médio em segundos** para gerar o **Índice de Criticidade ($I_{crit}$)** por logradouro viário, rankeando o nível de urgência de investimentos estruturais:
+O aplicativo contém uma análise exploratória que combina o volume de registros de congestionamento e o atraso médio por via. No código examinado, os pesos utilizados são 40% para volume e 60% para atraso:
 
-$$I_{crit} = \left( \left( \frac{V_{via}}{V_{max}} \times 0.4 \right) + \left( \frac{A_{via}}{A_{max}} \times 0.6 \right) \right) \times 100$$
+\[
+I_{\text{crit}} =
+100 \left(
+0{,}4 \frac{V_{\text{via}}}{V_{\text{máx}}}
++
+0{,}6 \frac{A_{\text{via}}}{A_{\text{máx}}}
+\right)
+\]
 
-* $V_{via}$ / $V_{max}$: Frequência volumétrica de retenções da via em relação ao pico registrado na malha urbana global.
-* $A_{via}$ / $A_{max}$: Severidade temporal (atraso médio em segundos) do trecho em relação ao limite máximo observado.
+O índice ordena as vias **dentro da base analisada**. Não equivale a uma medição absoluta de risco, nem determina automaticamente a necessidade de uma obra.
 
-### 🔮 Módulo Computacional Preditivo de Impacto Temporal
+### Resultados visuais
 
-#### Seção 1 — Simulador de Atraso por Extensão de Fila
-Modelo matemático inferencial calibrado estatisticamente com dados históricos locais que estima o atraso acumulado esperado ($D_{pred}$, em segundos) com base exclusiva no comprimento espacial della fila de congestionamento ($L$, em metros):
+Quando houver figuras publicadas em `assets/resultados/`, a aba de resultados visuais pode mostrá-las separadamente dos mapas interativos. Cada figura deve ser acompanhada de fonte, período e legenda adequados.
 
-$$D_{pred} = (L \times 0.15) + 12.0$$
+## Resultados descritos no resumo acadêmico
 
-* Inclui controle deslizante interativo (*slider* de 50 m a 5.000 m) para simulação de cenários proativos e testes de estresse viário.
+| Período | Registros de buracos | Mês de maior frequência | Via com mais registros |
+|---|---:|---|---|
+| 2024 | 7.296 | Maio: 1.460 | Avenida Paraná: 581 |
+| 2025 | 17.608 | Agosto: 3.166 | Avenida das Cataratas: 1.206 |
+| Janeiro–agosto de 2026 | 6.168 | Março: 1.175 | Avenida Felipe Wandscheer: 936 |
 
-#### Seção 2 — Matriz de Propensão Via × Dia da Semana
-Processamento estatístico contínuo sobre o banco histórico bruto que identifica quais vias têm maior propensão probabilística ao congestionamento em cada dia da semana. Exibido através de um mapa de calor adiacional bidimensional (YlOrRd do Plotly Express), revelando de forma inédita que os gargalos aduaneiros locais concentram-se nas **quintas-feiras e sábados**.
+Esses valores são **resultados apresentados no resumo**, não números impostos ao dashboard. Divergências entre eles e a aplicação exigem verificar a versão dos arquivos, a cobertura temporal, a interpretação das datas, os nomes das vias e os critérios de desduplicação.
 
-#### Seção 3 — Comparador Mensal Interanual (2025 vs. 2026)
-Ferramenta analítica longitudinal para validação de impacto de políticas públicas anteriores, cruzando dados sob múltiplos parâmetros:
+## Dados e processamento
 
-| Filtro e Controle | Descrição de Operação |
-|---|---|
-| **Ano A / Ano B** | Seleção pareada dos anos históricos presentes nas bases binárias. |
-| **Dia da Semana** | Isolamento de tendências para dias específicos (ex: comportamento apenas aos Sábados). |
-| **Categorias** | Multiselect estruturado por tipologia (ACIDENTE, CONGESTIONAMENTO, PERIGO, VIA FECHADA). |
+O projeto utiliza arquivos históricos CSV de alertas e, quando configurado, arquivos HDF5 acessados pelo Google Drive. O processamento inclui normalização de datas e categorias, extração de coordenadas, filtragem, agregação por período e via e criação de visualizações.
 
-Gera automaticamente curvas de linha sobrepostas de evolução macroscópica mensal, grades de barras segregadas por categoria de incidentes e indicadores gráficos de variação percentual ($\Delta\%$) mensal.
+A caixa de coordenadas utilizada em partes da aplicação é um **recorte geográfico aproximado** da área estudada, não o limite administrativo oficial do município.
 
-### 🔍 Filtros Inteligentes e Ingestão em Nuvem
-- Filtragem temporal responsiva por calendário e sliders de horários (0h às 23h).
-- Sincronização em tempo real com o Google Drive via Google Drive API v3 (Service Account GCP).
-- Suporte à leitura de arquivos binários de Big Data HDF5 (`.h5`) com desduplicação automática em tempo de execução baseada no identificador único universal (`UUID`) de alertas e congestionamentos.
-- Ciclos automáticos de atualização (*Auto-Refresh*) a cada 10 minutos com cache inteligente de recursos.
+## Limitações
 
-***
+- Os dados são colaborativos e podem conter registros incompletos ou imprecisos.
+- Um registro não corresponde necessariamente a um problema físico distinto.
+- Pode haver duplicidades, subnotificação e diferentes níveis de cobertura ao longo do tempo.
+- Nem todos os eventos possuem coordenadas ou geometrias de linha válidas.
+- A frequência de registros não mede, isoladamente, severidade ou custo de intervenção.
+- Rankings, mapas de concentração e índices relativos exigem validação com outras fontes e inspeções de campo.
 
-## 🚀 Como Executar o Projeto Localmente
+## Executar localmente
 
-### 1. Preparação do Ambiente Virtual
-Para prevenir falhas de compilação em dependências C e estouros de memória, utilize estritamente o interpretador **Python 3.11**:
+Recomenda-se Python 3.11 para reproduzir o ambiente de desenvolvimento.
 
 ```bash
-# Clonar o repositório
-git clone [https://github.com/LuisSantal/GEO_IA.git](https://github.com/LuisSantal/GEO_IA.git)
-cd GEO_IA
+git clone [https://github.com/LuisSantal/WazeFoz.git](https://github.com/LuisSantal/WazeFoz.git)
+cd WazeFoz
 
-# Instanciar e ativar o ambiente virtual
 python3.11 -m venv .venv
-source .venv/bin/activate       # No Linux/macOS
-.venv\Scripts\activate          # No Windows
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
 
-# Instalar dependências travadas
-pip install -r requirements.txt
+No Windows, ative o ambiente virtual com:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Os CSVs devem estar nos caminhos esperados pelo aplicativo. Para habilitar a leitura dos HDF5 no Google Drive, configure a conta de serviço nos **secrets do Streamlit** sob a chave `gcp_service_account`. Nunca publique chaves privadas, tokens ou arquivos de credenciais no repositório.
+
+O `requirements.txt` define predominantemente **versões mínimas** (`>=`), não um conjunto integralmente travado de versões.
+
+## Próximas etapas
+
+- Documentar e testar regras de limpeza e desduplicação.
+- Validar indicadores com inspeções de campo e bases institucionais.
+- Avaliar diferenças de cobertura entre períodos e fontes.
+- Aperfeiçoar a apresentação de mapas e séries temporais.
+- Desenvolver modelos adicionais **somente após calibração e validação**, antes de apresentá-los como previsões operacionais.
+
+## Créditos
+
+Desenvolvido por **Luis Enrique Santacruz Alvarez** no contexto da pesquisa de iniciação científica na UNILA, com colaboração e orientação da equipe identificada acima. Dados de mobilidade associados ao programa **Waze for Cities**.
