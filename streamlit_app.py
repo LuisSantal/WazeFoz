@@ -270,6 +270,8 @@ hr { border-color: var(--border) !important; }
 </style>
 """, unsafe_allow_html=True)
 
+st.markdown('\n<style>\n:root {--bg:#e7eff5;--surface:#fff;--primary:#428ca9;--primary-hover:#327b96;--primary-soft:#edf6fa;--border:#dbe5eb;--text:#344550;--text-strong:#253640;--radius:10px;}\n.stApp{background:linear-gradient(135deg,#d7e8f2,#eef4f8 55%,#dcebf3)!important}\n[data-testid="stSidebar"]{background:#f5f9fc!important;border-right:1px solid #d6e2e9!important}\n[data-testid="stMainBlockContainer"],.main .block-container{max-width:1800px!important}\n[data-testid="stMetric"],[data-testid="metric-container"]{background:white!important;border:1px solid #dbe5eb!important;border-radius:9px!important;padding:.7rem .9rem!important;box-shadow:0 2px 7px #2a607008!important}\n[data-testid="stMetricValue"]{font-size:1.4rem!important}\n[data-testid="stVerticalBlockBorderWrapper"]>div{border-color:#dbe5eb!important;border-radius:10px!important;background:white}\n.stTabs [data-baseweb="tab-list"]{background:#f4f8fb!important;border-color:#dbe5eb!important}\n.stTabs [aria-selected="true"]{background:#e0eff6!important;color:#28657f!important;box-shadow:none!important}\n[data-testid="stPlotlyChart"],iframe{border-radius:9px}\n</style>\n', unsafe_allow_html=True)
+
 TIMEZONE_FOZ = ZoneInfo("America/Sao_Paulo")
 
 
