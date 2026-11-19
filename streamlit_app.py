@@ -302,6 +302,7 @@ CSV_FILES_TO_MERGE = [
     "Waze for Cities Data _ buracos na via maio 2025 a maio 2026.csv",
     "Waze for Cities Data _ todos os alertas maio 2025 a maio 2026.csv",
     "Waze for Cities Data _Dashboard_Traffic Alerts_Tabela_2025-01-01-2026-07-04.csv",
+    "Waze for Cities Data _ Key Alerts Dashboard_Traffic Alerts_Tabela_atualizado_10.csv",
 ]
 
 LAT_MIN, LAT_MAX = -25.70, -25.40
