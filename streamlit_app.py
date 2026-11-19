@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 import io
@@ -25,7 +26,7 @@ st.set_page_config(
     page_title="Waze Foz do Iguaçu",
     page_icon="https://cdn.simpleicons.org/waze",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 st.markdown("""
@@ -270,7 +271,7 @@ hr { border-color: var(--border) !important; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('\n<style>\n:root {--bg:#e7eff5;--surface:#fff;--primary:#428ca9;--primary-hover:#327b96;--primary-soft:#edf6fa;--border:#dbe5eb;--text:#344550;--text-strong:#253640;--radius:10px;}\n.stApp{background:linear-gradient(135deg,#d7e8f2,#eef4f8 55%,#dcebf3)!important}\n[data-testid="stSidebar"]{background:#f5f9fc!important;border-right:1px solid #d6e2e9!important}\n[data-testid="stMainBlockContainer"],.main .block-container{max-width:1800px!important}\n[data-testid="stMetric"],[data-testid="metric-container"]{background:white!important;border:1px solid #dbe5eb!important;border-radius:9px!important;padding:.7rem .9rem!important;box-shadow:0 2px 7px #2a607008!important}\n[data-testid="stMetricValue"]{font-size:1.4rem!important}\n[data-testid="stVerticalBlockBorderWrapper"]>div{border-color:#dbe5eb!important;border-radius:10px!important;background:white}\n.stTabs [data-baseweb="tab-list"]{background:#f4f8fb!important;border-color:#dbe5eb!important}\n.stTabs [aria-selected="true"]{background:#e0eff6!important;color:#28657f!important;box-shadow:none!important}\n[data-testid="stPlotlyChart"],iframe{border-radius:9px}\n</style>\n', unsafe_allow_html=True)
+st.markdown('\n<style>\n:root {--bg:#e7eff5;--surface:#fff;--primary:#428ca9;--primary-hover:#327b96;--primary-soft:#edf6fa;--border:#dbe5eb;--text:#344550;--text-strong:#253640;--radius:10px;}\n.stApp{background:linear-gradient(135deg,#d7e8f2,#eef4f8 55%,#dcebf3)!important}\n[data-testid="stSidebar"]{background:#f5f9fc!important;border-right:1px solid #d6e2e9!important}\n[data-testid="stMainBlockContainer"],.main .block-container{max-width:99%!important;padding-left:0.8rem!important;padding-right:0.8rem!important}\n[data-testid="stMetric"],[data-testid="metric-container"]{background:white!important;border:1px solid #dbe5eb!important;border-radius:9px!important;padding:.7rem .9rem!important;box-shadow:0 2px 7px #2a607008!important}\n[data-testid="stMetricValue"]{font-size:1.4rem!important}\n[data-testid="stVerticalBlockBorderWrapper"]>div{border-color:#dbe5eb!important;border-radius:10px!important;background:white}\n.stTabs [data-baseweb="tab-list"]{background:#f4f8fb!important;border-color:#dbe5eb!important}\n.stTabs [aria-selected="true"]{background:#e0eff6!important;color:#28657f!important;box-shadow:none!important}\n[data-testid="stPlotlyChart"],iframe{border-radius:9px}\niframe[title*="streamlit_folium"],iframe[title*="pydeck"]{width:100%!important;min-height:78vh!important}\n</style>\n', unsafe_allow_html=True)
 
 TIMEZONE_FOZ = ZoneInfo("America/Sao_Paulo")
 
@@ -305,6 +306,7 @@ CSV_FILES_TO_MERGE = [
 
 LAT_MIN, LAT_MAX = -25.70, -25.40
 LON_MIN, LON_MAX = -54.75, -54.45
+
 
 def get_congestion_color(speed_kmh: float) -> str:
     if speed_kmh >= 80:
@@ -1427,8 +1429,161 @@ def build_jams_paths_3d(frame):
                      pickable=True, auto_highlight=True)
 
 
+def attach_pydeck_fullscreen_button(button_id: str = "pdk-fs-btn"):
+    components.html(f"""
+    <script>
+    (function() {{
+        const doc = window.parent.document;
+        const deckFrames = Array.from(doc.querySelectorAll('iframe[title*="pydeck"]'));
+        if (!deckFrames.length) return;
+
+        const targetFrame = deckFrames[deckFrames.length - 1];
+        const container = targetFrame.parentElement;
+        if (!container) return;
+
+        container.style.position = "relative";
+
+        const existingBtn = container.querySelector("#{button_id}");
+        if (existingBtn) existingBtn.remove();
+
+        const btn = doc.createElement("button");
+        btn.id = "{button_id}";
+        btn.innerHTML = "⛶";
+        btn.title = "Expandir mapa 3D em tela cheia";
+        btn.style.cssText = `
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 9999;
+            width: 34px;
+            height: 34px;
+            background: #ffffff;
+            color: #0f172a;
+            border: 2px solid rgba(0, 0, 0, 0.25);
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            line-height: 1;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s ease;
+        `;
+
+        btn.onmouseenter = () => btn.style.background = "#f1f5f9";
+        btn.onmouseleave = () => btn.style.background = "#ffffff";
+
+        btn.onclick = () => {{
+            if (!doc.fullscreenElement) {{
+                container.requestFullscreen().catch(err => console.warn(err));
+            }} else {{
+                doc.exitFullscreen();
+            }}
+        }};
+
+        doc.addEventListener("fullscreenchange", () => {{
+            const isFs = doc.fullscreenElement === container;
+            btn.innerHTML = isFs ? "✕" : "⛶";
+            btn.title = isFs ? "Sair da tela cheia (ESC)" : "Expandir mapa 3D em tela cheia";
+            targetFrame.style.height = isFs ? "100vh" : "";
+        }});
+
+        container.appendChild(btn);
+    }})();
+    </script>
+    """, height=0, width=0)
+
+
+def attach_pydeck_legend_overlay(mode: str, legend_id: str = "pdk-legend-box"):
+    if mode == "Fluxo de congestionamento":
+        title = "Velocidade do Fluxo"
+        items_html = """
+            <div><span style="background:#2196F3;"></span>80+ km/h (Livre)</div>
+            <div><span style="background:#4CAF50;"></span>60–80 km/h (Bom)</div>
+            <div><span style="background:#8BC34A;"></span>40–60 km/h (Moderado)</div>
+            <div><span style="background:#FF9800;"></span>20–40 km/h (Lento)</div>
+            <div><span style="background:#F44336;"></span>5–20 km/h (Muito lento)</div>
+            <div><span style="background:#7B1FA2;"></span>&lt; 5 km/h (Travado)</div>
+        """
+    elif mode in ("Densidade hexagonal", "Colunas por via", "Arcos de criticidade"):
+        title = "Concentração / Criticidade"
+        items_html = """
+            <div><span style="background:rgb(255,20,30);"></span>Alta concentração</div>
+            <div><span style="background:rgb(180,90,70);"></span>Média concentração</div>
+            <div><span style="background:rgb(60,190,120);"></span>Baixa concentração</div>
+        """
+    else:
+        title = "Gravidade dos Incidentes"
+        items_html = """
+            <div><span style="background:#B71C1C;"></span>Via fechada / Acidente grave</div>
+            <div><span style="background:#F44336;"></span>Acidente / Trânsito pesado</div>
+            <div><span style="background:#FF9800;"></span>Buraco / Perigo na via</div>
+            <div><span style="background:#FDD835;"></span>Alerta / Semáforo</div>
+            <div><span style="background:#29B6F6;"></span>Perigo climático</div>
+            <div><span style="background:#7B1FA2;"></span>Congestionamento</div>
+        """
+
+    components.html(f"""
+    <script>
+    (function() {{
+        const doc = window.parent.document;
+        const deckFrames = Array.from(doc.querySelectorAll('iframe[title*="pydeck"]'));
+        if (!deckFrames.length) return;
+
+        const targetFrame = deckFrames[deckFrames.length - 1];
+        const container = targetFrame.parentElement;
+        if (!container) return;
+
+        container.style.position = "relative";
+
+        const oldLegend = container.querySelector("#{legend_id}");
+        if (oldLegend) oldLegend.remove();
+
+        const legend = doc.createElement("div");
+        legend.id = "{legend_id}";
+        legend.innerHTML = `
+            <div style="font-weight:700;font-size:12px;margin-bottom:6px;color:#0f172a;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">
+                {title}
+            </div>
+            <div class="pdk-legend-items">{items_html}</div>
+        `;
+
+        legend.style.cssText = `
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            z-index: 9998;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(6px);
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-family: 'Inter', Arial, sans-serif;
+            font-size: 11px;
+            color: #334155;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+            pointer-events: none;
+            min-width: 165px;
+        `;
+
+        legend.querySelectorAll(".pdk-legend-items div").forEach(row => {{
+            row.style.cssText = "display:flex;align-items:center;gap:7px;margin:3px 0;line-height:1.3;";
+            const swatch = row.querySelector("span");
+            if (swatch) {{
+                swatch.style.cssText += "display:inline-block;width:11px;height:11px;border-radius:3px;flex-shrink:0;";
+            }}
+        }});
+
+        container.appendChild(legend);
+    }})();
+    </script>
+    """, height=0, width=0)
+
+
 def render_3d_map(frame, jams_frame, mode, style, zoom, pitch, bearing, radius, elevation,
-                  element_key="city3d", height=620, orientation="Sul", flat=False):
+                  element_key="city3d", height=820, orientation="Sul", flat=False):
     if mode == "Fluxo de congestionamento":
         layer = build_jams_paths_3d(jams_frame)
         layers = [layer] if layer is not None else []
@@ -1492,7 +1647,9 @@ def render_3d_map(frame, jams_frame, mode, style, zoom, pitch, bearing, radius, 
         f'</div>', unsafe_allow_html=True,
     )
     st.pydeck_chart(deck, width="stretch", height=height, key=element_key)
-    st.caption("Sul no topo por padrão. Camadas sem basemap; o modo Folium 2D usa OpenStreetMap norte no topo.")
+    attach_pydeck_fullscreen_button(button_id=f"fs_{element_key}")
+    attach_pydeck_legend_overlay(mode=mode, legend_id=f"legend_{element_key}")
+    st.caption("Sul no topo por padrão. Use ⛶ no canto superior direito para tela cheia. O modo Folium 2D usa OpenStreetMap norte no topo.")
 
 
 # =========================================================
@@ -1677,9 +1834,9 @@ except Exception as error:
     st.error(f"❌ Erro ao conectar com o Google Drive: {error}")
     st.markdown("""
     **Verifique:**
-    - As credenciais `gcp_service_account` estão configuradas em **Settings → Secrets**
-    - A Service Account tem acesso às pastas do Drive
-    - Os arquivos `.h5` existem nas pastas configuradas
+- As credenciais `gcp_service_account` estão configuradas em **Settings → Secrets**
+- A Service Account tem acesso às pastas do Drive
+- Os arquivos `.h5` existem nas pastas configuradas
     """)
     st.stop()
 
@@ -2626,6 +2783,13 @@ def build_annual_pothole_map(
             tiles="OpenStreetMap"
         )
 
+    plugins.Fullscreen(
+        position="topleft",
+        title="Expandir mapa",
+        title_cancel="Sair da tela cheia",
+        force_separate_button=True
+    ).add_to(annual_map)
+
     for _, street_row in top_streets_dataframe.iterrows():
         street_name = str(street_row["street"]).strip()
         city_name = str(street_row["city"]).strip()
@@ -2725,7 +2889,7 @@ filtro_rua = selected_street if "selected_street" in locals() and selected_stree
 df_criticidade_vias = road_criticality_dataframe.copy() if "road_criticality_dataframe" in locals() else pd.DataFrame()
 selected_date = selected_date if "selected_date" in locals() else datetime.now().date()
 st.markdown("""<style>
-.main .block-container{max-width:100% !important;padding:.7rem 1.1rem 1.6rem !important}
+.main .block-container{max-width:99% !important;padding:.7rem .8rem 1.6rem !important}
 .stTabs [data-baseweb="tab-list"]{overflow-x:auto;white-space:nowrap}
 .stTabs [data-baseweb="tab"]{border-radius:999px;padding:.45rem .8rem !important}
 </style>""",unsafe_allow_html=True)
@@ -2793,6 +2957,12 @@ def overview_2d(alerts,jams,layer='Ambos'):
     pts=prepare_points_for_deck(alerts)
     center=[float(pts['lat'].mean()),float(pts['lon'].mean())] if not pts.empty else [FOZ_CENTER_LAT,FOZ_CENTER_LON]
     m=folium.Map(location=center,zoom_start=12,tiles='OpenStreetMap',control_scale=True)
+    plugins.Fullscreen(
+        position="topleft",
+        title="Expandir mapa",
+        title_cancel="Sair da tela cheia",
+        force_separate_button=True
+    ).add_to(m)
     if layer in ('Ambos','Congestionamentos') and jams is not None and not jams.empty and 'line' in jams:
         lines=folium.FeatureGroup(name='Congestionamentos').add_to(m)
         for _,r in jams.head(250).iterrows():
@@ -2812,38 +2982,46 @@ def overview_2d(alerts,jams,layer='Ambos'):
 
 with tab_inicio:
     st.subheader("🗺️ WazeFoz — mapa temporal da mobilidade")
-    st.caption("Explore vias e ocorrências por horário. No PyDeck o sul inicia no topo; o mapa Folium 2D mantém norte no topo.")
+    st.caption("Explore vias e ocorrências por horário. Use o botão ⛶ no canto superior direito para expandir em tela cheia.")
     days=set()
     for frame in (df_alerts_raw,df_jams_raw):
         if not frame.empty and 'timestamp' in frame: days.update(pd.to_datetime(frame['timestamp'],errors='coerce').dropna().dt.date.tolist())
     default_day=selected_date if selected_date in days else (max(days) if days else current_foz_datetime.date())
-    filters,map_panel=st.columns([1.3,4.7],gap='small')
-    with filters:
-        query=st.text_input('Rua ou evento',placeholder='Ex.: Avenida Paraná',key='view_query')
-        day=st.date_input('Data',value=default_day,key='view_day')
-        layer=st.radio('Camadas',['Ambos','Alertas','Congestionamentos'],key='view_layer')
-        all_types=sorted(df_alerts_raw['type'].dropna().astype(str).unique().tolist()) if not df_alerts_raw.empty and 'type' in df_alerts_raw else []
-        selected_types=st.multiselect('Tipos',all_types,default=all_types,key='view_types')
-        timing=st.radio('Tempo',['Acumulado','Hora','Intervalo'],key='view_time')
-        if timing=='Intervalo': hours=st.slider('Horas',0,23,(0,23),key='view_hours')
-        else:
-            selected_hour=st.slider('Hora local',0,23,12,format='%02d:00',key='view_hour')
-            hours=(0,selected_hour) if timing=='Acumulado' else (selected_hour,selected_hour)
-        mode=st.segmented_control('Visualização',['2D','3D'],default='3D',key='overview_mode')
-        orientation=st.segmented_control('Orientação 3D',['Sul','Norte'],default='Sul',key='overview_orientation') if mode=='3D' else 'Norte'
+
+    with st.expander("🎛️ Filtros e Camadas do Mapa", expanded=True):
+        f1,f2,f3,f4=st.columns(4)
+        with f1:
+            query=st.text_input('Rua ou evento',placeholder='Ex.: Avenida Paraná',key='view_query')
+            day=st.date_input('Data',value=default_day,key='view_day')
+        with f2:
+            layer=st.radio('Camadas',['Ambos','Alertas','Congestionamentos'],key='view_layer',horizontal=True)
+            mode=st.segmented_control('Visualização',['2D','3D'],default='3D',key='overview_mode')
+        with f3:
+            all_types=sorted(df_alerts_raw['type'].dropna().astype(str).unique().tolist()) if not df_alerts_raw.empty and 'type' in df_alerts_raw else []
+            selected_types=st.multiselect('Tipos',all_types,default=all_types,key='view_types')
+            orientation=st.segmented_control('Orientação 3D',['Sul','Norte'],default='Sul',key='overview_orientation') if mode=='3D' else 'Norte'
+        with f4:
+            timing=st.radio('Tempo',['Acumulado','Hora','Intervalo'],key='view_time',horizontal=True)
+            if timing=='Intervalo': hours=st.slider('Horas',0,23,(0,23),key='view_hours')
+            else:
+                selected_hour=st.slider('Hora local',0,23,12,format='%02d:00',key='view_hour')
+                hours=(0,selected_hour) if timing=='Acumulado' else (selected_hour,selected_hour)
+
     alert_view=overview_filter(df_alerts_raw,day,hours,query,selected_types)
     jam_view=overview_filter(df_jams_raw,day,hours,query)
-    with map_panel:
-        k1,k2,k3=st.columns(3)
-        k1.metric('Alertas',len(alert_view))
-        k2.metric('Buracos',int(alert_view['subtype'].astype(str).str.upper().eq('BURACO NA VIA').sum()) if not alert_view.empty and 'subtype' in alert_view else 0)
-        k3.metric('Congestionamentos',len(jam_view))
-        if mode=='2D':
-            st_folium(overview_2d(alert_view,jam_view,layer),height=620,width='100%',returned_objects=[],key='overview_osm')
-            st.caption('N ↑ · Folium/OpenStreetMap permanece norte no topo; rotação sul-up não é suportada sem plugin.')
-        else:
-            mode3d='Fluxo de congestionamento' if layer=='Congestionamentos' else 'Densidade hexagonal'
-            render_3d_map(alert_view,jam_view,mode3d,deck_map_style_label,deck_zoom,deck_pitch,deck_bearing,deck_hex_radius,deck_elevation_scale,element_key='overview_deck',orientation=orientation)
+
+    k1,k2,k3=st.columns(3)
+    k1.metric('Alertas',len(alert_view))
+    k2.metric('Buracos',int(alert_view['subtype'].astype(str).str.upper().eq('BURACO NA VIA').sum()) if not alert_view.empty and 'subtype' in alert_view else 0)
+    k3.metric('Congestionamentos',len(jam_view))
+
+    if mode=='2D':
+        st_folium(overview_2d(alert_view,jam_view,layer),height=820,width='stretch',returned_objects=[],key='overview_osm')
+        st.caption('N ↑ · Folium/OpenStreetMap permanece norte no topo; rotação sul-up não é suportada sem plugin.')
+    else:
+        mode3d='Fluxo de congestionamento' if layer=='Congestionamentos' else 'Densidade hexagonal'
+        render_3d_map(alert_view,jam_view,mode3d,deck_map_style_label,deck_zoom,deck_pitch,deck_bearing,deck_hex_radius,deck_elevation_scale,element_key='overview_deck',height=820,orientation=orientation)
+
     day_records=overview_filter(df_alerts_raw,day,(0,23),query,selected_types)
     if not day_records.empty:
         counts=pd.to_datetime(day_records['timestamp'],errors='coerce').dt.hour.value_counts().reindex(range(24),fill_value=0).rename_axis('Hora').reset_index(name='Ocorrências')
@@ -2878,7 +3056,7 @@ with tab_inc:
         m_inc = generate_incidents_map(df_filtered.to_json(date_format="iso"))
 
         if m_inc:
-            st_folium(m_inc, width="100%", height=500, key=f"mapa_inc_{len(df_filtered)}")
+            st_folium(m_inc, width="stretch", height=800, key=f"mapa_inc_{len(df_filtered)}")
 
             st.markdown("""
             | Cor | Tipo / Natureza |
@@ -2903,7 +3081,7 @@ with tab_jams:
         m_jam = generate_jams_map(df_jams_filtered.to_json(date_format="iso"))
 
         if m_jam:
-            st_folium(m_jam, width="100%", height=500, key=f"mapa_jam_{len(df_jams_filtered)}")
+            st_folium(m_jam, width="stretch", height=800, key=f"mapa_jam_{len(df_jams_filtered)}")
 
             st.markdown("""
             | Cor | Velocidade | Status |
@@ -2939,10 +3117,10 @@ with tab_calor:
             ]
 
             if not df_heat.empty:
-                m_heat = folium.Map(
-                    location=[df_heat["lat"].mean(), df_heat["lon"].mean()],
-                    zoom_start=13,
-                    tiles="OpenStreetMap"
+                m_heat = create_folium_map_with_compass(
+                    df_heat["lat"].mean(),
+                    df_heat["lon"].mean(),
+                    zoom_level=13
                 )
 
                 heat_data = [[row["lat"], row["lon"]] for _, row in df_heat.iterrows()]
@@ -2960,7 +3138,7 @@ with tab_calor:
                     }
                 ).add_to(m_heat)
 
-                st_folium(m_heat, width="100%", height=500, key=f"mapa_heat_{len(df_heat)}")
+                st_folium(m_heat, width="stretch", height=800, key=f"mapa_heat_{len(df_heat)}")
 
                 st.markdown("""
                 | Cor | Concentração |
@@ -2997,14 +3175,14 @@ with tab_3d:
     city_orientation=st.segmented_control('Orientação 3D',['Sul','Norte'],default='Sul',key='city_orientation') if city_view=='3D' else 'Norte'
     if city_view=='2D':
         city_layer='Congestionamentos' if modo_3d=='Fluxo de congestionamento' else 'Alertas'
-        st_folium(overview_2d(base_3d,jams_3d,city_layer),height=610,width='100%',returned_objects=[],key='city_osm')
+        st_folium(overview_2d(base_3d,jams_3d,city_layer),height=820,width='stretch',returned_objects=[],key='city_osm')
         st.caption('N ↑ · OpenStreetMap em vista 2D padrão. Para sul no topo, use 3D/PyDeck.')
     if city_view=='3D' and st.button("🗺️ Exibir mapa 3D", key="open_3d"):
         st.session_state["show_city_3d"] = True
     if city_view=='3D' and st.session_state.get("show_city_3d", False):
         render_3d_map(base_3d, jams_3d, modo_3d, deck_map_style_label,
                       deck_zoom, deck_pitch, deck_bearing, deck_hex_radius,
-                      deck_elevation_scale, element_key="city3d_main", orientation=city_orientation)
+                      deck_elevation_scale, element_key="city3d_main", height=820, orientation=city_orientation)
     elif city_view=='3D':
         st.info("Clique em Exibir mapa 3D para carregar esta visualização.")
     st.divider()
@@ -3030,7 +3208,7 @@ with tab_3d:
                 st.caption(f"{pd.Timestamp(buckets[index]).strftime('%d/%m/%Y %H:%M')} · {len(moment)} registros")
                 render_3d_map(moment, jams_3d, "Densidade hexagonal", deck_map_style_label,
                               deck_zoom, deck_pitch, deck_bearing, deck_hex_radius,
-                              deck_elevation_scale, element_key="city3d_timeline", height=510,
+                              deck_elevation_scale, element_key="city3d_timeline", height=720,
                       orientation=city_orientation)
                 serie = data_anim.groupby("bucket").size().reset_index(name="Ocorrências")
                 st.plotly_chart(px.area(serie, x="bucket", y="Ocorrências", title="Ocorrências no tempo"),
@@ -3221,8 +3399,8 @@ with tab_temporal_anual:
                             if mapa_anual is not None:
                                 st_folium(
                                     mapa_anual,
-                                    width="100%",
-                                    height=560,
+                                    width="stretch",
+                                    height=800,
                                     key=f"annual_pothole_map_{ano_analise}"
                                 )
                             elif annual_maps_enabled:
